@@ -11,7 +11,7 @@ pub struct InternalError {
 
 impl fmt::Display for InternalError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{} (path: {})", self.msg, self.path)
+    write!(f, "{} (path: {}, err: {})", self.msg, self.path, self.err)
   }
 }
 
