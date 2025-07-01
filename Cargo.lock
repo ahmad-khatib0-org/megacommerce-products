@@ -195,9 +195,9 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "h2"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9421a676d1b147b16b82c9225157dc629087ef8ec4d5e2960f9437a90dac0a5"
+checksum = "17da50a276f1e01e0ba6c029e47b7100754904ee8a278f886546e98575380785"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -368,9 +368,9 @@ checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
 name = "megacommerce-products"
-version = "0.1.0"
+version = "0.1.11"
 dependencies = [
- "megacommerce-proto",
+ "megacommerce-protos",
  "serde",
  "serde_yaml",
  "tokio",
@@ -378,10 +378,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "megacommerce-proto"
-version = "0.1.0"
+name = "megacommerce-protos"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c37dcb81d63bff68d5657bbeb7ac0c2b323659568ba55c1721aaa1e040ba2821"
+checksum = "1b2a98994240103345bcaf0c378acbf36903e00e6d7e014a5b8e9b1073c6f7b4"
 dependencies = [
  "prost 0.13.5",
  "prost-types",

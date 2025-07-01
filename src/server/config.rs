@@ -38,7 +38,6 @@ impl Server {
     };
 
     let mut config = self.config.lock().await;
-    // config.
     *config = parsed_config;
   }
 }
