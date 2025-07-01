@@ -1,10 +1,10 @@
 use std::fs;
 
 use crate::models::{config::Config, errors::InternalError};
-use crate::server::server::Server;
+use crate::server::main::Server;
 
 impl Server {
-  pub async fn init_service_config(&self) {
+  pub(crate) async fn init_service_config(&self) {
     let yaml_string = match fs::read_to_string("config.yaml") {
       Ok(s) => s,
       Err(err) => {
@@ -37,7 +37,7 @@ impl Server {
       }
     };
 
-    let mut config = self.config.lock().await;
+    let mut config = self.service_config.lock().await;
     *config = parsed_config;
   }
 }

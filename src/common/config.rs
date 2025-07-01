@@ -8,7 +8,7 @@ use super::init::Common;
 use crate::{models::errors::InternalError, utils::net::validate_url_target};
 
 impl Common {
-  pub(crate) async fn init_common_client(
+  pub(super) async fn init_common_client(
     &mut self,
   ) -> Result<CommonServiceClient<Channel>, Box<dyn Error>> {
     let mk_err = |msg: &str, err: Box<dyn Error + Send + Sync>| {
@@ -37,17 +37,21 @@ impl Common {
     let request = Request::new(PingRequest {});
     let respones = timeout(Duration::from_secs(5), client.ping(request)).await;
     match respones {
-      Ok(Ok(_resp)) => Ok(()),
-      Ok(Err(e)) => Err(mk_err(
-        "failed to ping the common client service",
-        Box::new(e),
-      )),
-      Err(e) => Err(mk_err(
-        "the ping to common client service timedout",
-        Box::new(e),
-      )),
+      Ok(Ok(_)) => {}
+      Ok(Err(e)) => {
+        return Err(mk_err(
+          "failed to ping the common client service",
+          Box::new(e),
+        ))
+      }
+      Err(e) => {
+        return Err(mk_err(
+          "the ping to common client service timedout",
+          Box::new(e),
+        ))
+      }
     };
 
-    return Ok(client);
+    Ok(client)
   }
 }

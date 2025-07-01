@@ -10,7 +10,7 @@ use crate::models::config::Config as ServiceConfig;
 
 #[derive(Debug)]
 pub struct CommonArgs {
-  service_config: ServiceConfig,
+  pub service_config: ServiceConfig,
 }
 
 #[derive(Debug)]
@@ -34,5 +34,27 @@ impl Common {
     }
 
     Ok(common)
+  }
+
+  /// Close the client connection by dropping it
+  pub fn close(&mut self) {
+    self.client = None;
+    // When `client` is dropped, the underlying Channel drops and closes the connection.
+  }
+
+  /// Reconnect: close old client if any, then create new one
+  pub async fn reconnect(&mut self) -> Result<(), Box<dyn Error>> {
+    self.close(); // drop old client if present
+    let client = self.init_common_client().await?;
+    self.client = Some(client);
+    Ok(())
+  }
+
+  /// Accessor for client with error if not connected
+  pub fn client(&self) -> Result<&CommonServiceClient<Channel>, Box<dyn Error>> {
+    self
+      .client
+      .as_ref()
+      .ok_or_else(|| "client not connected".into())
   }
 }
