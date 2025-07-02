@@ -37,6 +37,11 @@ impl Common {
     Ok(common)
   }
 
+  pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    self.config_get().await?;
+    Ok(())
+  }
+
   /// Close the client connection by dropping it
   pub fn close(&mut self) {
     self.client = None;
@@ -53,9 +58,6 @@ impl Common {
 
   /// Accessor for client with error if not connected
   pub fn client(&mut self) -> Result<&mut CommonServiceClient<Channel>, Box<dyn Error>> {
-    self
-      .client
-      .as_mut()
-      .ok_or_else(|| "client not connected".into())
+    self.client.as_mut().ok_or_else(|| "client not connected".into())
   }
 }

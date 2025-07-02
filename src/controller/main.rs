@@ -1,8 +1,8 @@
 use std::{error::Error, net::SocketAddr};
 
-use log::info;
 use megacommerce_proto::{products_service_server::ProductsServiceServer, Config as SharedConfig};
 use tonic::transport::Server as GrpcServer;
+use tracing::info;
 
 use crate::{models::errors::InternalError, utils::net::validate_url_target};
 

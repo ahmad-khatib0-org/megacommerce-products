@@ -44,6 +44,14 @@ impl Server {
       Err(err) => return Err(err),
     };
 
+    match server.common.as_mut().unwrap().config_get().await {
+      Ok(cfg) => {
+        let mut shared_config = server.shared_config.lock().await;
+        *shared_config = cfg;
+      }
+      Err(err) => return Err(err),
+    }
+
     let err_rx = rx;
     spawn(async move {
       Server::errors_listener(err_rx).await;
