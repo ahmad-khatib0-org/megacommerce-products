@@ -6,7 +6,8 @@ use tokio::spawn;
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::sync::Mutex;
 
-use crate::common::init::{Common, CommonArgs};
+use crate::common::main::{Common, CommonArgs};
+use crate::controller::main::{Controller, ControllerArgs};
 use crate::models::config::Config as ServiceConfig;
 use crate::models::errors::InternalError;
 
@@ -31,13 +32,11 @@ impl Server {
       shared_config: Arc::new(Mutex::new(SharedConfig::default())),
     };
 
-    server.init_service_config().await;
+    server.init_service_config().await?;
 
     let common_args = {
-      let service_config = server.service_config.lock().await;
-      CommonArgs {
-        service_config: (*service_config).clone(),
-      }
+      let service_config = server.service_config.lock().await.clone();
+      CommonArgs { service_config }
     };
 
     match Common::new(common_args).await {
@@ -53,9 +52,19 @@ impl Server {
     Ok(server)
   }
 
+  pub async fn run(&self) -> Result<(), Box<dyn Error>> {
+    let ctr_args = {
+      let cfg = self.shared_config.lock().await.clone();
+      ControllerArgs { cfg }
+    };
+
+    let controller = Controller::new(ctr_args);
+    controller.run().await
+  }
+
   async fn errors_listener(mut receiver: Receiver<InternalError>) {
     while let Some(msg) = receiver.recv().await {
-      println!("{}", msg)
+      println!("from here {}", msg)
     }
   }
 }

@@ -1,60 +1,52 @@
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, time::Duration};
 
-use tokio::sync::Mutex;
-use tonic::transport::Channel;
+use megacommerce_proto::{common_service_client::CommonServiceClient, PingRequest};
+use tokio::time::timeout;
+use tonic::{transport::Channel, Request};
 
-use megacommerce_proto::{common_service_client::CommonServiceClient, Config as SharedConfig};
-
-use crate::models::config::Config as ServiceConfig;
-
-#[derive(Debug)]
-pub struct CommonArgs {
-  pub service_config: ServiceConfig,
-}
-
-#[derive(Debug)]
-pub struct Common {
-  pub(crate) shared_config: Arc<Mutex<SharedConfig>>,
-  pub(crate) service_config: ServiceConfig,
-  pub(crate) client: Option<CommonServiceClient<Channel>>,
-}
+use super::main::Common;
+use crate::{models::errors::InternalError, utils::net::validate_url_target};
 
 impl Common {
-  pub async fn new(args: CommonArgs) -> Result<Common, Box<dyn Error>> {
-    let mut common = Common {
-      shared_config: Arc::new(Mutex::new(SharedConfig::default())),
-      service_config: args.service_config,
-      client: None,
+  pub(super) async fn init_common_client(
+    &mut self,
+  ) -> Result<CommonServiceClient<Channel>, Box<dyn Error>> {
+    let mk_err = |msg: &str, err: Box<dyn Error + Send + Sync>| {
+      Box::new(InternalError {
+        temp: false,
+        msg: msg.into(),
+        path: "products.common.init_common_client".into(),
+        err,
+      }) as Box<dyn Error>
     };
 
-    match common.init_common_client().await {
-      Ok(cli) => common.client = Some(cli),
-      Err(e) => return Err(e),
+    let url = self.service_config.service.common_service_grpc_url.clone();
+    if let Err(e) = validate_url_target(&url) {
+      return Err(mk_err("failed to validate common client URL", Box::new(e)));
     }
 
-    Ok(common)
-  }
+    let mut client = CommonServiceClient::connect(url)
+      .await
+      .map_err(|e| mk_err("failed to connect to common client", Box::new(e)))?;
 
-  /// Close the client connection by dropping it
-  pub fn close(&mut self) {
-    self.client = None;
-    // When `client` is dropped, the underlying Channel drops and closes the connection.
-  }
+    let request = Request::new(PingRequest {});
+    let respones = timeout(Duration::from_secs(5), client.ping(request)).await;
+    match respones {
+      Ok(Ok(_)) => {}
+      Ok(Err(e)) => {
+        return Err(mk_err(
+          "failed to ping the common client service",
+          Box::new(e),
+        ))
+      }
+      Err(e) => {
+        return Err(mk_err(
+          "the ping to common client service timedout",
+          Box::new(e),
+        ))
+      }
+    };
 
-  /// Reconnect: close old client if any, then create new one
-  pub async fn reconnect(&mut self) -> Result<(), Box<dyn Error>> {
-    self.close(); // drop old client if present
-    let client = self.init_common_client().await?;
-    self.client = Some(client);
-    Ok(())
-  }
-
-  /// Accessor for client with error if not connected
-  pub fn client(&self) -> Result<&CommonServiceClient<Channel>, Box<dyn Error>> {
-    self
-      .client
-      .as_ref()
-      .ok_or_else(|| "client not connected".into())
+    Ok(client)
   }
 }

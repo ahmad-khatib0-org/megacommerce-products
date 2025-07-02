@@ -1,10 +1,9 @@
-use std::{
-  io::{Error, ErrorKind::InvalidInput},
-  net::SocketAddr,
-};
+use http::Uri;
+use std::io::{Error, ErrorKind};
 
-pub fn validate_url_target(url: &str) -> Result<SocketAddr, Error> {
+pub fn validate_url_target(url: &str) -> Result<Uri, Error> {
   url
-    .parse::<SocketAddr>()
-    .map_err(|e| Error::new(InvalidInput, format!("invalid provided address {}", e)))
+    .parse::<Uri>()
+    .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("invalid URL: {}", e)))
 }
+

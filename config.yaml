@@ -1,6 +1,5 @@
 ---
 service:
   env: dev
-  grpc_port: 50053
-  grpc_host: localhost
-  common_service_grpc_url: localhost:50051
+  service_grpc_url: 127.0.0.1:50053
+  common_service_grpc_url: http://127.0.0.1:50051

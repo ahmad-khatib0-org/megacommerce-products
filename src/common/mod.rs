@@ -1,2 +1,3 @@
 mod config;
-pub mod init;
+mod init;
+pub mod main;

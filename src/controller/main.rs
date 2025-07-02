@@ -1,21 +1,45 @@
-use megacommerce_proto::{products_service_server, Config as SharedConfig};
-use std::error::Error;
-use tonic::{transport::Server as GrpcServer, Request, Response, Status};
+use std::{error::Error, net::SocketAddr};
+
+use log::info;
+use megacommerce_proto::{products_service_server::ProductsServiceServer, Config as SharedConfig};
+use tonic::transport::Server as GrpcServer;
+
+use crate::{models::errors::InternalError, utils::net::validate_url_target};
 
 #[derive(Debug)]
-struct Controller {
-  cfg: Option<SharedConfig>,
+pub struct Controller {
+  cfg: SharedConfig,
 }
 
 #[derive(Debug)]
-struct ControllerArgs {}
+pub struct ControllerArgs {
+  pub cfg: SharedConfig,
+}
 
 impl Controller {
   pub fn new(args: ControllerArgs) -> Controller {
-    let ctr = Controller { cfg: None };
-
-    ctr
+    Controller { cfg: args.cfg }
   }
 
-  // pub fn run() -> Result<(), Box<dyn Error>> {}
+  pub async fn run(self) -> Result<(), Box<dyn Error>> {
+    let srv = self.cfg.services.as_ref().unwrap().clone();
+
+    let url = srv.products_service_grpc_url();
+    validate_url_target(url).map_err(|e| {
+      Box::new(InternalError {
+        err: Box::new(e),
+        temp: false,
+        msg: "failed to run products service server".into(),
+        path: "products.controller.run".into(),
+      })
+    })?;
+
+    info!("products service server is running on: {}", url);
+    GrpcServer::builder()
+      .add_service(ProductsServiceServer::new(self))
+      .serve((url.parse::<SocketAddr>()).unwrap())
+      .await?;
+
+    Ok(())
+  }
 }

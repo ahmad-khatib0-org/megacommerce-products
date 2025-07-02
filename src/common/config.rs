@@ -1,57 +1,46 @@
 use std::{error::Error, time::Duration};
 
-use megacommerce_proto::{common_service_client::CommonServiceClient, PingRequest};
+use megacommerce_proto::{config_get_response, ConfigGetRequest};
 use tokio::time::timeout;
-use tonic::{transport::Channel, Request};
+use tonic::Request;
 
-use super::init::Common;
-use crate::{models::errors::InternalError, utils::net::validate_url_target};
+use crate::models::errors::InternalError;
+
+use super::main::Common;
 
 impl Common {
-  pub(super) async fn init_common_client(
-    &mut self,
-  ) -> Result<CommonServiceClient<Channel>, Box<dyn Error>> {
+  pub async fn config_get(&mut self) -> Result<(), Box<dyn Error>> {
+    let err_msg = "failed to get configurations from common service";
     let mk_err = |msg: &str, err: Box<dyn Error + Send + Sync>| {
       Box::new(InternalError {
         temp: false,
-        msg: msg.into(),
-        path: "products.common.init_common_client".into(),
         err,
-      }) as Box<dyn Error>
+        msg: msg.into(),
+        path: "products.common.config_get".into(),
+      })
     };
 
-    let url = format!(
-      "{}:{}",
-      self.service_config.service.gprc_host.clone(),
-      self.service_config.service.grpc_port.clone()
-    );
+    let req = Request::new(ConfigGetRequest {});
+    let res = timeout(Duration::from_secs(5), self.client().unwrap().config_get(req)).await;
 
-    if let Err(e) = validate_url_target(&url) {
-      return Err(mk_err("failed to validate common client URL", Box::new(e)));
+    match res {
+      Ok(res) => match res?.into_inner().response {
+        Some(config_get_response::Response::Data(res)) => {
+          println!("got the config");
+        }
+        Some(config_get_response::Response::Error(res)) => {
+          // return Err(mk_err(err_msg, Box::new(res)));
+        }
+        None => {
+          return Err(mk_err("missing response field in config_get", "empty".into()));
+        }
+      },
+      Err(e) => {
+        return Err(mk_err("failed to get configurations: request timeout", Box::new(e)));
+      }
+      Ok(Err(e)) => {}
     }
 
-    let mut client = CommonServiceClient::connect(url)
-      .await
-      .map_err(|e| mk_err("failed to connect to common client", Box::new(e)))?;
-
-    let request = Request::new(PingRequest {});
-    let respones = timeout(Duration::from_secs(5), client.ping(request)).await;
-    match respones {
-      Ok(Ok(_)) => {}
-      Ok(Err(e)) => {
-        return Err(mk_err(
-          "failed to ping the common client service",
-          Box::new(e),
-        ))
-      }
-      Err(e) => {
-        return Err(mk_err(
-          "the ping to common client service timedout",
-          Box::new(e),
-        ))
-      }
-    };
-
-    Ok(client)
+    Ok(())
   }
 }
