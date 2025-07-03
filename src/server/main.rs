@@ -10,6 +10,7 @@ use crate::common::main::{Common, CommonArgs};
 use crate::controller::main::{Controller, ControllerArgs};
 use crate::models::config::Config as ServiceConfig;
 use crate::models::errors::InternalError;
+use crate::models::trans::translations_init;
 
 pub struct Server {
   pub(crate) errors: mpsc::Sender<InternalError>,
@@ -60,11 +61,25 @@ impl Server {
     Ok(server)
   }
 
-  pub async fn run(&self) -> Result<(), Box<dyn Error>> {
+  pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
     let ctr_args = {
       let cfg = self.shared_config.lock().await.clone();
       ControllerArgs { cfg }
     };
+
+    match self.common.as_mut().unwrap().translations_get().await {
+      Ok(res) => {
+        translations_init(res, 5).map_err(|e| {
+          Box::new(InternalError {
+            temp: false,
+            err: Box::new(e),
+            msg: "failed to initialize translations".into(),
+            path: "products.server.run".into(),
+          })
+        })?;
+      }
+      Err(err) => return Err(err),
+    }
 
     let controller = Controller::new(ctr_args);
     controller.run().await

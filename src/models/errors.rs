@@ -3,7 +3,10 @@ use std::{collections::HashMap, error::Error, fmt};
 use derive_more::Display;
 use megacommerce_proto::{AppError as AppErrorProto, NestedStringMap, StringMap};
 
-use crate::models::{context::Context, trans::TranslateFunc};
+use crate::models::{
+  context::Context,
+  trans::{tr, TranslateFunc},
+};
 
 const MAX_ERROR_LENGTH: usize = 1024;
 const NO_TRANSLATION: &str = "<untranslated>";
@@ -31,7 +34,7 @@ pub struct AppError {
   pub detailed_error: String,
   pub request_id: Option<String>,
   pub status_code: Option<i32>,
-  pub tr_params: HashMap<String, serde_json::Value>, // any => serde_json::Value
+  pub tr_params: Option<HashMap<String, serde_json::Value>>,
   pub params: HashMap<String, String>,
   pub nested_params: HashMap<String, HashMap<String, String>>,
   pub where_: String,
@@ -44,7 +47,7 @@ impl AppError {
     ctx: Option<Box<Context>>,
     where_: impl Into<String>,
     id: impl Into<String>,
-    tr_params: HashMap<String, serde_json::Value>,
+    tr_params: &HashMap<String, serde_json::Value>,
     details: impl Into<String>,
     status_code: Option<i32>,
     wrapped: Option<Box<dyn Error + Send + Sync>>,
@@ -56,7 +59,7 @@ impl AppError {
       detailed_error: details.into(),
       request_id: None,
       status_code,
-      tr_params,
+      tr_params: (!tr_params.is_empty()).then(|| tr_params.clone()),
       params: HashMap::new(),
       nested_params: HashMap::new(),
       where_: where_.into(),
@@ -64,7 +67,12 @@ impl AppError {
       wrapped,
     };
 
-    err.translate(Some(Box::new(tr)));
+    let boxed_tr = Box::new(|lang: &str, id: &str, params: &HashMap<String, serde_json::Value>| {
+      let params_option = if params.is_empty() { None } else { Some(params.clone()) };
+      tr(lang, id, params_option).map_err(|e| Box::new(e) as Box<dyn Error>)
+    });
+
+    err.translate(Some(boxed_tr));
     err
   }
 
@@ -107,7 +115,9 @@ impl AppError {
 
     if let Some(tf) = tf {
       if let Some(ref ctx) = self.ctx {
-        if let Ok(translated) = tf(&ctx.accept_language, &self.id, &self.tr_params) {
+        let empty = HashMap::new();
+        let params = self.tr_params.as_ref().unwrap_or(&empty);
+        if let Ok(translated) = tf(&ctx.accept_language, &self.id, params) {
           self.message = translated;
           return;
         }
@@ -138,7 +148,7 @@ impl AppError {
       detailed_error: String::new(),
       request_id: None,
       status_code: None,
-      tr_params: HashMap::new(),
+      tr_params: None,
       params: HashMap::new(),
       nested_params: HashMap::new(),
       where_: String::new(),
@@ -198,7 +208,7 @@ pub fn app_error_from_proto_app_error(ae: &AppErrorProto) -> AppError {
     detailed_error: ae.detailed_error.clone(),
     request_id: if ae.request_id.is_empty() { None } else { Some(ae.request_id.clone()) },
     status_code: Some(ae.status_code as i32),
-    tr_params: HashMap::new(),
+    tr_params: None,
     params,
     nested_params: nested,
     where_: ae.r#where.clone(),
@@ -218,13 +228,4 @@ impl Error for AppError {
   fn source(&self) -> Option<&(dyn Error + 'static)> {
     self.wrapped.as_ref().map(|e| e.as_ref() as &(dyn Error + 'static))
   }
-}
-
-// Dummy translation function
-pub(super) fn tr(
-  _lang: &str,
-  id: &str,
-  _params: &HashMap<String, serde_json::Value>,
-) -> Result<String, Box<dyn Error>> {
-  Ok(id.to_string()) // TODO: implement it
 }

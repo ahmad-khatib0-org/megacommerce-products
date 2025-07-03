@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
   let server = Server::new(args).await;
   match server {
-    Ok(srv) => return srv.run().await,
+    Ok(mut srv) => return srv.run().await,
     Err(e) => Err(e),
   }
 }
