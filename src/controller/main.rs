@@ -1,10 +1,14 @@
 use std::{error::Error, net::SocketAddr};
 
 use megacommerce_proto::{products_service_server::ProductsServiceServer, Config as SharedConfig};
-use tonic::transport::Server as GrpcServer;
+use tonic::{service::InterceptorLayer, transport::Server as GrpcServer};
+use tower::ServiceBuilder;
 use tracing::info;
 
-use crate::{models::errors::InternalError, utils::net::validate_url_target};
+use crate::{
+  controller::middleware::auth_middleware, models::errors::InternalError,
+  utils::net::validate_url_target,
+};
 
 #[derive(Debug)]
 pub struct Controller {
@@ -34,8 +38,11 @@ impl Controller {
       })
     })?;
 
+    let layer = ServiceBuilder::new().layer(InterceptorLayer::new(auth_middleware)).into_inner();
+
     info!("products service server is running on: {}", url);
     GrpcServer::builder()
+      .layer(layer)
       .add_service(ProductsServiceServer::new(self))
       .serve((url.parse::<SocketAddr>()).unwrap())
       .await?;
