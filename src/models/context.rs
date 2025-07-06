@@ -51,7 +51,7 @@ impl Session {
 
 #[derive(Clone, Debug, Default)]
 pub struct Context {
-  pub session: Option<Session>,
+  pub session: Session,
   pub request_id: String,
   pub ip_address: String,
   pub x_forwarded_for: String,
@@ -62,7 +62,7 @@ pub struct Context {
 
 impl Context {
   pub fn new(
-    session: Option<Session>,
+    session: Session,
     request_id: String,
     ip_address: String,
     x_forwarded_for: String,
@@ -85,8 +85,8 @@ impl Context {
     }
   }
 
-  pub fn session(&self) -> Option<&Session> {
-    self.session.as_ref()
+  pub fn session(&self) -> Session {
+    self.session.clone()
   }
   pub fn request_id(&self) -> &str {
     &self.request_id

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, time::Duration};
+use std::{collections::HashMap, error::Error, sync::Arc, time::Duration};
 
 use megacommerce_proto::{TranslationElements, TranslationsGetRequest};
 use tokio::time::timeout;
@@ -6,6 +6,7 @@ use tonic::Request;
 
 use crate::{
   common::main::Common,
+  models::context::Context,
   models::errors::{app_error_from_proto_app_error, InternalError},
 };
 
@@ -30,7 +31,8 @@ impl Common {
       Ok(Ok(res)) => {
         if res.get_ref().error.is_some() {
           let err = &res.get_ref().error.as_ref().unwrap();
-          return Err(mk_err(err_msg, Box::new(app_error_from_proto_app_error(err))));
+          let ctx = Arc::new(Context::default());
+          return Err(mk_err(err_msg, Box::new(app_error_from_proto_app_error(ctx, err))));
         } else {
           Ok(res.get_ref().data.clone())
         }

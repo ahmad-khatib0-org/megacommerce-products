@@ -28,7 +28,7 @@ impl Error for InternalError {
 
 #[derive(Debug)]
 pub struct AppError {
-  pub ctx: Option<Arc<Context>>,
+  pub ctx: Arc<Context>,
   pub id: String,
   pub message: String,
   pub detailed_error: String,
@@ -44,7 +44,7 @@ pub struct AppError {
 
 impl AppError {
   pub fn new(
-    ctx: Option<Arc<Context>>,
+    ctx: Arc<Context>,
     where_: impl Into<String>,
     id: impl Into<String>,
     tr_params: Option<HashMap<String, serde_json::Value>>,
@@ -59,7 +59,7 @@ impl AppError {
       detailed_error: details.into(),
       request_id: None,
       status_code,
-      tr_params: tr_params,
+      tr_params,
       params: HashMap::new(),
       nested_params: HashMap::new(),
       where_: where_.into(),
@@ -114,13 +114,11 @@ impl AppError {
     }
 
     if let Some(tf) = tf {
-      if let Some(ref ctx) = self.ctx {
-        let empty = HashMap::new();
-        let params = self.tr_params.as_ref().unwrap_or(&empty);
-        if let Ok(translated) = tf(&ctx.accept_language, &self.id, params) {
-          self.message = translated;
-          return;
-        }
+      let empty = HashMap::new();
+      let params = self.tr_params.as_ref().unwrap_or(&empty);
+      if let Ok(translated) = tf(&self.ctx.accept_language, &self.id, params) {
+        self.message = translated;
+        return;
       }
     }
     self.message = self.id.clone();
@@ -142,7 +140,7 @@ impl AppError {
 
   pub fn default() -> Self {
     Self {
-      ctx: None,
+      ctx: Arc::new(Context::default()),
       id: String::new(),
       message: String::new(),
       detailed_error: String::new(),
@@ -198,11 +196,11 @@ pub fn convert_proto_params(
 }
 
 // Convert from proto-generated struct
-pub fn app_error_from_proto_app_error(ae: &AppErrorProto) -> AppError {
+pub fn app_error_from_proto_app_error(ctx: Arc<Context>, ae: &AppErrorProto) -> AppError {
   let (params, nested) = convert_proto_params(ae);
 
   AppError {
-    ctx: None,
+    ctx,
     id: ae.id.clone(),
     message: ae.message.clone(),
     detailed_error: ae.detailed_error.clone(),

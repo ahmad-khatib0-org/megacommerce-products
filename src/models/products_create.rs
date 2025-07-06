@@ -17,7 +17,7 @@ static PRODUCT_SKU_MIN_LENGTH: usize = 3;
 static PRODUCT_SKU_MAX_LENGTH: usize = 60;
 
 pub fn products_create_is_valid(
-  ctx: Option<Arc<Context>>,
+  ctx: Arc<Context>,
   product: &ProductCreateRequest,
   existing_tags: &Vec<ProductTag>,
 ) -> Result<(), AppError> {
@@ -79,7 +79,7 @@ pub fn products_create_is_valid(
 }
 
 fn error_builder<T: Display>(
-  ctx: Option<Arc<Context>>,
+  ctx: Arc<Context>,
   field_name: &str,
   field_value: T,
   params: Option<HashMap<String, Value>>,

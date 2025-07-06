@@ -1,10 +1,13 @@
-use std::{error::Error, time::Duration};
+use std::{error::Error, sync::Arc, time::Duration};
 
 use megacommerce_proto::{config_get_response, Config as SharedConfig, ConfigGetRequest};
 use tokio::time::timeout;
 use tonic::Request;
 
-use crate::models::errors::{app_error_from_proto_app_error, InternalError};
+use crate::models::{
+  context::Context,
+  errors::{app_error_from_proto_app_error, InternalError},
+};
 
 use super::main::Common;
 
@@ -30,7 +33,7 @@ impl Common {
           *config = res;
         }
         Some(config_get_response::Response::Error(res)) => {
-          let err = app_error_from_proto_app_error(&res);
+          let err = app_error_from_proto_app_error(Arc::new(Context::default()), &res);
           return Err(mk_err(err_msg, Box::new(err)));
         }
         None => {
