@@ -1,10 +1,10 @@
-struct Currency {
+pub struct Currency {
   pub name: &'static str,
   pub code: &'static str,
   pub symbol: &'static str,
 }
 
-const CURRENCY_LIST: &[Currency] = &[
+pub const CURRENCY_LIST: &[Currency] = &[
   Currency { name: "Afghan Afghani", code: "AFA", symbol: "؋" },
   Currency { name: "Albanian Lek", code: "ALL", symbol: "Lek" },
   Currency { name: "Algerian Dinar", code: "DZD", symbol: "دج" },

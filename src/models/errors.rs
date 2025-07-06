@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 
 use derive_more::Display;
 use megacommerce_proto::{AppError as AppErrorProto, NestedStringMap, StringMap};
@@ -28,7 +28,7 @@ impl Error for InternalError {
 
 #[derive(Debug)]
 pub struct AppError {
-  pub ctx: Option<Box<Context>>,
+  pub ctx: Option<Arc<Context>>,
   pub id: String,
   pub message: String,
   pub detailed_error: String,
@@ -44,10 +44,10 @@ pub struct AppError {
 
 impl AppError {
   pub fn new(
-    ctx: Option<Box<Context>>,
+    ctx: Option<Arc<Context>>,
     where_: impl Into<String>,
     id: impl Into<String>,
-    tr_params: &HashMap<String, serde_json::Value>,
+    tr_params: Option<HashMap<String, serde_json::Value>>,
     details: impl Into<String>,
     status_code: Option<i32>,
     wrapped: Option<Box<dyn Error + Send + Sync>>,
@@ -59,7 +59,7 @@ impl AppError {
       detailed_error: details.into(),
       request_id: None,
       status_code,
-      tr_params: (!tr_params.is_empty()).then(|| tr_params.clone()),
+      tr_params: tr_params,
       params: HashMap::new(),
       nested_params: HashMap::new(),
       where_: where_.into(),
