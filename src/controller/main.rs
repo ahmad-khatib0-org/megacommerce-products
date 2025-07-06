@@ -6,7 +6,8 @@ use tower::ServiceBuilder;
 use tracing::info;
 
 use crate::{
-  controller::middleware::auth_middleware, models::errors::InternalError,
+  controller::middleware::{auth_middleware, context_middleware},
+  models::errors::InternalError,
   utils::net::validate_url_target,
 };
 
@@ -38,7 +39,10 @@ impl Controller {
       })
     })?;
 
-    let layer = ServiceBuilder::new().layer(InterceptorLayer::new(auth_middleware)).into_inner();
+    let layer = ServiceBuilder::new()
+      // .layer(InterceptorLayer::new(auth_middleware))
+      .layer(InterceptorLayer::new(context_middleware))
+      .into_inner();
 
     info!("products service server is running on: {}", url);
     GrpcServer::builder()

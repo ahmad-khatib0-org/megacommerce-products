@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use megacommerce_proto::{ProductCreateRequest, ProductTag};
-use serde_json::{Number, Value};
+use serde_json::{json, Number, Value};
 use tonic::Code;
 
 use crate::{
@@ -76,6 +76,19 @@ pub fn products_create_is_valid(
   }
 
   Ok(())
+}
+
+pub fn products_create_create_auditable(p: &ProductCreateRequest) -> Value {
+  let tags: Vec<String> = p.tags.iter().map(|t| t.name.clone()).collect();
+  json!({
+    "title": p.title,
+    "description": p.description,
+    "sku": p.sku,
+    "price": p.price,
+    "currency_code": p.currency_code,
+    "tags": tags,
+    "ar_enabled" : p.ar_enabled,
+  })
 }
 
 fn error_builder<T: Display>(

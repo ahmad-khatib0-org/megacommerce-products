@@ -1,5 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, fmt, sync::Arc};
 
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -7,13 +8,26 @@ use super::context::Context;
 
 pub type AnyMap = HashMap<String, Value>;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Display, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EventName {
   ProductCreate,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Display, Clone, PartialEq, Eq)]
+pub enum EventParameterKey {
+  ProductCreate,
+}
+
+impl EventParameterKey {
+  pub fn as_string(&self) -> Cow<'static, str> {
+    match self {
+      Self::ProductCreate => Cow::Borrowed("product_create"),
+    }
+  }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Display, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EventStatus {
   Fail,
@@ -21,7 +35,14 @@ pub enum EventStatus {
   Attempt,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Display, Default)]
+#[display(
+  "AuditEventData: {:?} {:?} {:?} {}",
+  parameters,
+  prior_state,
+  resulting_state,
+  object_type
+)]
 pub struct AuditEventData {
   pub parameters: AnyMap,
   pub prior_state: AnyMap,
@@ -29,7 +50,8 @@ pub struct AuditEventData {
   pub object_type: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Display)]
+#[display("EventStatus: {user_id} {session_id} {client} {ip_address} {x_forwarded_for}")]
 pub struct AuditEventActor {
   pub user_id: String,
   pub session_id: String,
@@ -47,7 +69,14 @@ pub struct EventError {
   pub status_code: Option<i32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+impl fmt::Display for EventError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "EventError: {} {}", self.description, self.status_code.unwrap_or(0))
+  }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Display)]
+#[display("AuditRecord: {event_name} {status} {event} {actor} {:?}", meta)]
 pub struct AuditRecord {
   pub event_name: EventName,
   pub status: EventStatus,
@@ -90,8 +119,8 @@ impl AuditRecord {
     }
   }
 
-  pub fn set_parameter(&mut self, key: String, val: Value) {
-    self.event.parameters.insert(key, val);
+  pub fn set_event_parameter(&mut self, key: EventParameterKey, val: Value) {
+    self.event.parameters.insert(key.as_string().into_owned(), val);
   }
 
   pub fn set_prior_state(&mut self, data: AnyMap) {
