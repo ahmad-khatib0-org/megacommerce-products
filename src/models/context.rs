@@ -1,8 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
+
+use derive_more::Display;
 
 pub type StringMap = HashMap<String, String>;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Display)]
+#[display("Session: {id} {token} {created_at} {expires_at} {last_activity_at} {user_id} {device_id} {roles} {is_oauth} {props:?}")]
 pub struct Session {
   pub id: String,
   pub token: String,
@@ -49,7 +52,8 @@ impl Session {
   }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Display)]
+#[display("Context: {session} {request_id} {ip_address} {x_forwarded_for} {path} {user_agent} {accept_language}")]
 pub struct Context {
   pub session: Session,
   pub request_id: String,
