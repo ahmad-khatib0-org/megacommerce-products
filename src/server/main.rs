@@ -11,6 +11,7 @@ use crate::controller::main::{Controller, ControllerArgs};
 use crate::models::config::Config as ServiceConfig;
 use crate::models::errors::InternalError;
 use crate::models::trans::translations_init;
+use crate::store::cache::Cache;
 
 pub struct Server {
   pub(crate) errors: mpsc::Sender<InternalError>,
@@ -62,21 +63,23 @@ impl Server {
   }
 
   pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    let mk_err = |msg: &str, e: Box<dyn Error + Sync + Send>| InternalError {
+      temp: false,
+      err: e,
+      msg: msg.to_string(),
+      path: "products.server.run".into(),
+    };
+
+    let cache = Arc::new(Cache::new().await.map_err(|e| mk_err("failed to initialize cache", e))?);
     let ctr_args = {
       let cfg = self.shared_config.lock().await.clone();
-      ControllerArgs { cfg }
+      ControllerArgs { cfg, cache: cache }
     };
 
     match self.common.as_mut().unwrap().translations_get().await {
       Ok(res) => {
-        translations_init(res, 5).map_err(|e| {
-          Box::new(InternalError {
-            temp: false,
-            err: Box::new(e),
-            msg: "failed to initialize translations".into(),
-            path: "products.server.run".into(),
-          })
-        })?;
+        translations_init(res, 5)
+          .map_err(|e| mk_err("failed to init translations", Box::new(e)))?;
       }
       Err(err) => return Err(err),
     }

@@ -196,7 +196,9 @@ checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -694,6 +696,7 @@ checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 name = "megacommerce-products"
 version = "0.1.11"
 dependencies = [
+ "chrono",
  "derive_more",
  "http",
  "megacommerce-proto",
@@ -715,9 +718,9 @@ dependencies = [
 
 [[package]]
 name = "megacommerce-proto"
-version = "0.1.14"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f2920af01f2a5d1e00303580c9bba09c6ac10703264bc7b144e7c583db568e0"
+checksum = "b7869de4fbfcd8c964657e8769cf8372a1ce556b3a6ef5e94be6b41b583497f1"
 dependencies = [
  "prost 0.13.5",
  "prost-types",

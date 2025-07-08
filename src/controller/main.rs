@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr, sync::Arc};
 
 use megacommerce_proto::{products_service_server::ProductsServiceServer, Config as SharedConfig};
 use tonic::{service::InterceptorLayer, transport::Server as GrpcServer};
@@ -8,22 +8,25 @@ use tracing::info;
 use crate::{
   controller::middleware::{auth_middleware, context_middleware},
   models::errors::InternalError,
+  store::cache::Cache,
   utils::net::validate_url_target,
 };
 
 #[derive(Debug)]
 pub struct Controller {
-  cfg: SharedConfig,
+  pub(super) cfg: SharedConfig,
+  pub(super) cache: Arc<Cache>,
 }
 
 #[derive(Debug)]
 pub struct ControllerArgs {
   pub cfg: SharedConfig,
+  pub cache: Arc<Cache>,
 }
 
 impl Controller {
   pub fn new(args: ControllerArgs) -> Controller {
-    Controller { cfg: args.cfg }
+    Controller { cfg: args.cfg, cache: Arc::clone(&args.cache) }
   }
 
   pub async fn run(self) -> Result<(), Box<dyn Error>> {

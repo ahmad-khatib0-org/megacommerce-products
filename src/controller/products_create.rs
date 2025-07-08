@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use megacommerce_proto::{
-  products_service_server::ProductsService, ProductCreateRequest, ProductCreateResponse,
+  product_create_response::Response::{Data, Error as ResError},
+  products_service_server::ProductsService,
+  ProductCreateRequest, ProductCreateResponse,
 };
 use tonic::{Request, Response, Status};
 
@@ -10,7 +12,10 @@ use crate::{
   models::{
     audit::{AuditRecord, EventName::ProductCreate, EventParameterKey, EventStatus::Fail},
     context::Context,
-    products_create::products_create_create_auditable,
+    errors::AppError,
+    products_create::{
+      products_create_auditable, products_create_is_valid, products_create_pre_save,
+    },
   },
 };
 
@@ -22,15 +27,20 @@ impl ProductsService for Controller {
   ) -> Result<Response<ProductCreateResponse>, Status> {
     let ctx = req.extensions().get::<Arc<Context>>().cloned().unwrap();
     let pro = req.into_inner();
+    let return_err =
+      |e: AppError| Response::new(ProductCreateResponse { response: Some(ResError(e.to_proto())) });
 
-    let mut audit = AuditRecord::new(ctx, ProductCreate, Fail);
-    audit.set_event_parameter(
-      EventParameterKey::ProductCreate,
-      products_create_create_auditable(&pro),
-    );
-    println!("{}", &audit);
+    let mut audit = AuditRecord::new(ctx.clone(), ProductCreate, Fail);
+    audit.set_event_parameter(EventParameterKey::ProductCreate, products_create_auditable(&pro));
 
-    let response = ProductCreateResponse {};
-    Ok(Response::new(response))
+    if let Err(err) = products_create_is_valid(ctx.clone(), &pro, self.cache.tags()) {
+      return Ok(return_err(err));
+    }
+    if let Err(err) = products_create_pre_save(ctx, &pro) {
+      return Ok(return_err(err));
+    }
+
+    audit.success();
+    Ok(Response::new(ProductCreateResponse { response: Some(Data(())) }))
   }
 }

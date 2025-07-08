@@ -1,13 +1,20 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{
+  collections::{HashMap, HashSet},
+  fmt::Display,
+  sync::Arc,
+};
 
-use megacommerce_proto::{ProductCreateRequest, ProductTag};
+use megacommerce_proto::{Product, ProductCreateRequest, ProductCreateTag, ProductTag};
 use serde_json::{json, Number, Value};
 use tonic::Code;
 
 use crate::{
   data::currencies::CURRENCY_LIST,
   models::{context::Context, errors::AppError},
+  utils::{slug::Slug, time::time_get_millis},
 };
+
+use super::products::ProductStatus;
 
 static PRODUCT_TITLE_MIN_LENGTH: usize = 5;
 static PRODUCT_TITLE_MAX_LENGTH: usize = 250;
@@ -19,7 +26,7 @@ static PRODUCT_SKU_MAX_LENGTH: usize = 60;
 pub fn products_create_is_valid(
   ctx: Arc<Context>,
   product: &ProductCreateRequest,
-  existing_tags: &Vec<ProductTag>,
+  existing_tags: Arc<Vec<ProductTag>>,
 ) -> Result<(), AppError> {
   let ProductCreateRequest { title, description, currency_code, sku, tags, price, ar_enabled } =
     product;
@@ -63,11 +70,9 @@ pub fn products_create_is_valid(
     return Err(error_builder(ctx, "sku", title, Some(p)));
   }
 
-  for tag in tags {
-    if !existing_tags.contains(tag) {
-      let p = HashMap::from([("Tag".to_string(), Value::String(tag.name.clone()))]);
-      return Err(error_builder(ctx, "tags.not_exists", title, Some(p)));
-    }
+  if let Err(tag) = check_if_tags_exist(existing_tags, tags) {
+    let p = HashMap::from([("Tag".to_string(), Value::String(tag.name.unwrap_or_default()))]);
+    return Err(error_builder(ctx, "tags.not_exists", title, Some(p)));
   }
 
   if *price <= 0 {
@@ -78,8 +83,46 @@ pub fn products_create_is_valid(
   Ok(())
 }
 
-pub fn products_create_create_auditable(p: &ProductCreateRequest) -> Value {
-  let tags: Vec<String> = p.tags.iter().map(|t| t.name.clone()).collect();
+pub fn products_create_pre_save(
+  ctx: Arc<Context>,
+  pro: &ProductCreateRequest,
+) -> Result<Product, AppError> {
+  let id = ulid::Ulid::new().to_string();
+  let slug = Slug::default().generate_slug(&pro.title);
+  let tags = pro
+    .tags
+    .clone()
+    .iter()
+    .map(|t| {
+      let id = if t.id.is_some() { t.id } else { None };
+      let name = if t.name.is_some() { t.name.clone() } else { None };
+      ProductTag { id, name }
+    })
+    .collect();
+
+  Ok(Product {
+    id,
+    user_id: ctx.session().user_id().to_string(),
+    sku: pro.sku.clone(),
+    version: 1,
+    status: ProductStatus::Pending.as_string(),
+    title: pro.title.clone(),
+    description: pro.description.clone(),
+    slug: slug,
+    price: pro.price.clone(),
+    currency_code: pro.currency_code.clone(),
+    tags,
+    metadata: None,
+    ar_enabled: pro.ar_enabled,
+    created_at: time_get_millis(),
+    published_at: None,
+    updated_at: None,
+  })
+}
+
+pub fn products_create_auditable(p: &ProductCreateRequest) -> Value {
+  let tags: Vec<Value> = p.tags.iter().map(|t| json!({"id": t.id ,  "name": t.name})).collect();
+
   json!({
     "title": p.title,
     "description": p.description,
@@ -108,4 +151,20 @@ fn error_builder<T: Display>(
     Some(Code::InvalidArgument.into()),
     None,
   )
+}
+
+fn check_if_tags_exist(
+  existing: Arc<Vec<ProductTag>>,
+  incoming: &Vec<ProductCreateTag>,
+) -> Result<(), ProductCreateTag> {
+  let existing_tags: HashSet<u32> = existing.iter().filter_map(|t| t.id).collect();
+  for tag in incoming {
+    if let Some(id) = tag.id {
+      if !existing_tags.contains(&id) {
+        return Err(tag.clone());
+      }
+    }
+  }
+
+  Ok(())
 }

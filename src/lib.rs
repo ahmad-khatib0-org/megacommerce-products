@@ -3,4 +3,5 @@ pub mod controller;
 pub mod data;
 pub mod models;
 pub mod server;
+pub mod store;
 pub mod utils;
