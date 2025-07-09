@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use megacommerce_products::server::main::{Server, ServerArgs};
+use megacommerce_products::server::{Server, ServerArgs};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 

@@ -2,6 +2,7 @@ use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 
 use derive_more::Display;
 use megacommerce_proto::{AppError as AppErrorProto, NestedStringMap, StringMap};
+use tonic::Code;
 
 use crate::models::{
   context::Context,
@@ -39,7 +40,7 @@ pub struct AppError {
   pub nested_params: HashMap<String, HashMap<String, String>>,
   pub where_: String,
   pub skip_translation: bool,
-  pub wrapped: Option<Box<dyn Error + Send + Sync>>,
+  pub error: Option<Box<dyn Error + Send + Sync>>,
 }
 
 impl AppError {
@@ -50,7 +51,7 @@ impl AppError {
     tr_params: Option<HashMap<String, serde_json::Value>>,
     details: impl Into<String>,
     status_code: Option<i32>,
-    wrapped: Option<Box<dyn Error + Send + Sync>>,
+    error: Option<Box<dyn Error + Send + Sync>>,
   ) -> Self {
     let mut err = Self {
       ctx,
@@ -64,7 +65,7 @@ impl AppError {
       nested_params: HashMap::new(),
       where_: where_.into(),
       skip_translation: false,
-      wrapped,
+      error,
     };
 
     let boxed_tr = Box::new(|lang: &str, id: &str, params: &HashMap<String, serde_json::Value>| {
@@ -95,9 +96,9 @@ impl AppError {
       s.push_str(&self.detailed_error);
     }
 
-    if let Some(ref wrapped) = self.wrapped {
+    if let Some(ref err) = self.error {
       s.push_str(", ");
-      s.push_str(&wrapped.to_string());
+      s.push_str(&err.to_string());
     }
 
     if s.len() > MAX_ERROR_LENGTH {
@@ -125,16 +126,16 @@ impl AppError {
   }
 
   pub fn unwrap(&self) -> Option<&(dyn Error + Send + Sync)> {
-    self.wrapped.as_deref()
+    self.error.as_deref()
   }
 
   pub fn wrap(mut self, err: Box<dyn Error + Send + Sync>) -> Self {
-    self.wrapped = Some(err);
+    self.error = Some(err);
     self
   }
 
   pub fn wipe_detailed(&mut self) {
-    self.wrapped = None;
+    self.error = None;
     self.detailed_error.clear();
   }
 
@@ -151,7 +152,7 @@ impl AppError {
       nested_params: HashMap::new(),
       where_: String::new(),
       skip_translation: false,
-      wrapped: None,
+      error: None,
     }
   }
 
@@ -173,6 +174,18 @@ impl AppError {
       nested_params: Some(NestedStringMap { data: nested }),
       request_id: self.request_id.clone().unwrap_or_default(),
     }
+  }
+
+  pub fn to_internal(self, ctx: Arc<Context>, path: String) -> Self {
+    Self::new(
+      ctx,
+      path,
+      "server.internal.error",
+      None,
+      self.detailed_error,
+      Some(Code::Internal.into()),
+      self.error,
+    )
   }
 }
 
@@ -211,7 +224,7 @@ pub fn app_error_from_proto_app_error(ctx: Arc<Context>, ae: &AppErrorProto) -> 
     nested_params: nested,
     where_: ae.r#where.clone(),
     skip_translation: ae.skip_translation,
-    wrapped: None,
+    error: None,
   }
 }
 
@@ -224,6 +237,6 @@ impl fmt::Display for AppError {
 
 impl Error for AppError {
   fn source(&self) -> Option<&(dyn Error + 'static)> {
-    self.wrapped.as_ref().map(|e| e.as_ref() as &(dyn Error + 'static))
+    self.error.as_ref().map(|e| e.as_ref() as &(dyn Error + 'static))
   }
 }

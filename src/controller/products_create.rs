@@ -8,7 +8,7 @@ use megacommerce_proto::{
 use tonic::{Request, Response, Status};
 
 use crate::{
-  controller::main::Controller,
+  controller::Controller,
   models::{
     audit::{AuditRecord, EventName::ProductCreate, EventParameterKey, EventStatus::Fail},
     context::Context,
@@ -27,6 +27,7 @@ impl ProductsService for Controller {
   ) -> Result<Response<ProductCreateResponse>, Status> {
     let ctx = req.extensions().get::<Arc<Context>>().cloned().unwrap();
     let pro = req.into_inner();
+    let path = "products.controller.product_create";
     let return_err =
       |e: AppError| Response::new(ProductCreateResponse { response: Some(ResError(e.to_proto())) });
 
@@ -36,8 +37,14 @@ impl ProductsService for Controller {
     if let Err(err) = products_create_is_valid(ctx.clone(), &pro, self.cache.tags()) {
       return Ok(return_err(err));
     }
-    if let Err(err) = products_create_pre_save(ctx, &pro) {
-      return Ok(return_err(err));
+
+    let pro_db = products_create_pre_save(ctx.clone(), &pro);
+    if pro_db.is_err() {
+      return Ok(return_err(pro_db.unwrap_err().to_internal(ctx.clone(), path.into())));
+    }
+
+    if let Err(err) = self.store.product_create(ctx.clone(), &pro_db.unwrap()).await {
+      return Ok(return_err(err.to_app_error_internal(ctx.clone(), path.into())));
     }
 
     audit.success();

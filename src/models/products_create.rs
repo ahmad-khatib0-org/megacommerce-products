@@ -5,7 +5,7 @@ use std::{
 };
 
 use megacommerce_proto::{Product, ProductCreateRequest, ProductCreateTag, ProductTag};
-use serde_json::{json, Number, Value};
+use serde_json::{json, Value};
 use tonic::Code;
 
 use crate::{
@@ -75,9 +75,17 @@ pub fn products_create_is_valid(
     return Err(error_builder(ctx, "tags.not_exists", title, Some(p)));
   }
 
-  if *price <= 0 {
-    let p = HashMap::from([("Price".to_string(), Value::Number(Number::from(*price)))]);
-    return Err(error_builder(ctx, "tags.not_exists", title, Some(p)));
+  let price_err = || {
+    error_builder(
+      ctx.clone(),
+      "price.invalid",
+      price,
+      Some(HashMap::from([("Price".to_string(), Value::String(price.clone()))])),
+    )
+  };
+  let parsed_price = price.parse::<f64>().map_err(|_| price_err())?;
+  if parsed_price <= 0.0 {
+    return Err(price_err());
   }
 
   Ok(())

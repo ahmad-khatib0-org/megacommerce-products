@@ -3,6 +3,11 @@ use sqlx::error::Error as SqlxError;
 use sqlx::postgres::PgDatabaseError;
 use std::error::Error;
 use std::fmt;
+use std::sync::Arc;
+use tonic::Code;
+
+use crate::models::context::Context;
+use crate::models::errors::AppError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DBErrorType {
@@ -36,7 +41,7 @@ impl fmt::Display for DBErrorType {
 #[derive(Debug)]
 pub struct DBError {
   pub err_type: DBErrorType,
-  pub err: Option<Box<dyn Error + Send + Sync>>,
+  pub err: Box<dyn Error + Send + Sync>,
   pub msg: String,
   pub path: String,
   pub details: String,
@@ -60,29 +65,33 @@ impl fmt::Display for DBError {
       parts.push(format!("details: {}", self.details));
     }
 
-    if let Some(ref err) = self.err {
-      parts.push(format!("err: {}", err));
-    }
+    parts.push(format!("err: {}", self.err));
 
     write!(f, "{}", parts.join(", "))
-  }
-}
-
-impl Error for DBError {
-  fn source(&self) -> Option<&(dyn Error + 'static)> {
-    self.err.as_ref().map(|e| &**e as &dyn Error)
   }
 }
 
 impl DBError {
   pub fn new(
     err_type: DBErrorType,
-    err: Option<Box<dyn Error + Send + Sync>>,
+    err: Box<dyn Error + Send + Sync>,
     msg: impl Into<String>,
     path: impl Into<String>,
     details: impl Into<String>,
   ) -> Self {
     Self { err_type, err, msg: msg.into(), path: path.into(), details: details.into() }
+  }
+
+  pub fn to_app_error_internal(self, ctx: Arc<Context>, path: String) -> AppError {
+    AppError::new(
+      ctx,
+      path,
+      "server.internal.error",
+      None,
+      self.details,
+      Some(Code::Internal.into()),
+      Some(self.err),
+    )
   }
 }
 
@@ -123,18 +132,18 @@ pub fn handle_db_error(err: SqlxError, path: &str) -> DBError {
         _ => DBErrorType::Internal,
       };
 
-      DBError::new(err_type, Some(Box::new(SqlxError::Database(db_err))), msg, path, details)
+      DBError::new(err_type, Box::new(SqlxError::Database(db_err)), msg, path, details)
     }
 
     SqlxError::RowNotFound => DBError::new(
       DBErrorType::NoRows,
-      Some(Box::new(SqlxError::RowNotFound)),
+      Box::new(SqlxError::RowNotFound),
       "the requested resource is not found",
       path,
       "",
     ),
 
-    _ => DBError::new(DBErrorType::Internal, Some(Box::new(err)), "database error", path, ""),
+    _ => DBError::new(DBErrorType::Internal, Box::new(err), "database error", path, ""),
   }
 }
 

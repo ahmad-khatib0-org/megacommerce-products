@@ -1,8 +1,10 @@
 use std::error::Error;
 use std::fs;
 
-use crate::models::{config::Config, errors::InternalError};
-use crate::server::main::Server;
+use crate::{
+  models::{config::Config, errors::InternalError},
+  server::Server,
+};
 
 impl Server {
   pub(crate) async fn init_service_config(&self) -> Result<(), Box<dyn Error>> {
