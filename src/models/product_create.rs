@@ -10,18 +10,18 @@ use tonic::Code;
 
 use crate::{
   data::currencies::CURRENCY_LIST,
-  models::{context::Context, errors::AppError},
+  models::{
+    context::Context,
+    errors::AppError,
+    products::{
+      PRODUCT_DESCRIPTION_MAX_LENGTH, PRODUCT_DESCRIPTION_MIN_LENGTH, PRODUCT_SKU_MAX_LENGTH,
+      PRODUCT_SKU_MIN_LENGTH, PRODUCT_TITLE_MAX_LENGTH, PRODUCT_TITLE_MIN_LENGTH,
+    },
+  },
   utils::{slug::Slug, time::time_get_millis},
 };
 
 use super::products::ProductStatus;
-
-static PRODUCT_TITLE_MIN_LENGTH: usize = 5;
-static PRODUCT_TITLE_MAX_LENGTH: usize = 250;
-static PRODUCT_DESCRIPTION_MIN_LENGTH: usize = 20;
-static PRODUCT_DESCRIPTION_MAX_LENGTH: usize = 1024;
-static PRODUCT_SKU_MIN_LENGTH: usize = 3;
-static PRODUCT_SKU_MAX_LENGTH: usize = 60;
 
 pub fn products_create_is_valid(
   ctx: Arc<Context>,

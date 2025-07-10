@@ -1,6 +1,6 @@
 mod audit;
 mod middleware;
-mod products_create;
+mod product_create;
 
 use std::{error::Error, net::SocketAddr, sync::Arc};
 

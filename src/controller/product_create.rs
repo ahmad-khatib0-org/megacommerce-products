@@ -13,7 +13,7 @@ use crate::{
     audit::{AuditRecord, EventName::ProductCreate, EventParameterKey, EventStatus::Fail},
     context::Context,
     errors::AppError,
-    products_create::{
+    product_create::{
       products_create_auditable, products_create_is_valid, products_create_pre_save,
     },
   },
