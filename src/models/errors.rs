@@ -12,11 +12,45 @@ use crate::models::{
 const MAX_ERROR_LENGTH: usize = 1024;
 const NO_TRANSLATION: &str = "<untranslated>";
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorType {
+  NoRows,
+  UniqueViolation,
+  ForeignKeyViolation,
+  NotNullViolation,
+  JsonMarshal,
+  JsonUnmarshal,
+  Connection,
+  Privileges,
+  Internal,
+  DBConnectionError,
+  ConfigError,
+}
+
+impl fmt::Display for ErrorType {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      ErrorType::NoRows => write!(f, "no_rows"),
+      ErrorType::UniqueViolation => write!(f, "unique_violation"),
+      ErrorType::ForeignKeyViolation => write!(f, "foreign_key_violation"),
+      ErrorType::NotNullViolation => write!(f, "not_null_violation"),
+      ErrorType::JsonMarshal => write!(f, "json_marshal"),
+      ErrorType::JsonUnmarshal => write!(f, "json_unmarshal"),
+      ErrorType::Connection => write!(f, "connection_exception"),
+      ErrorType::Privileges => write!(f, "insufficient_privilege"),
+      ErrorType::Internal => write!(f, "internal_error"),
+      ErrorType::DBConnectionError => write!(f, "db_connection_error"),
+      ErrorType::ConfigError => write!(f, "config_error"),
+    }
+  }
+}
+
 #[derive(Debug, Display)]
 #[display("InternalError: {} {} {} {}", temp, err, msg, path)]
 pub struct InternalError {
   pub temp: bool,
   pub err: Box<dyn Error + Send + Sync>,
+  pub err_type: ErrorType,
   pub msg: String,
   pub path: String,
 }

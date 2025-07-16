@@ -7,40 +7,11 @@ use std::sync::Arc;
 use tonic::Code;
 
 use crate::models::context::Context;
-use crate::models::errors::AppError;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum DBErrorType {
-  NoRows,
-  UniqueViolation,
-  ForeignKeyViolation,
-  NotNullViolation,
-  JsonMarshal,
-  JsonUnmarshal,
-  Connection,
-  Privileges,
-  Internal,
-}
-
-impl fmt::Display for DBErrorType {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      DBErrorType::NoRows => write!(f, "no_rows"),
-      DBErrorType::UniqueViolation => write!(f, "unique_violation"),
-      DBErrorType::ForeignKeyViolation => write!(f, "foreign_key_violation"),
-      DBErrorType::NotNullViolation => write!(f, "not_null_violation"),
-      DBErrorType::JsonMarshal => write!(f, "json_marshal"),
-      DBErrorType::JsonUnmarshal => write!(f, "json_unmarshal"),
-      DBErrorType::Connection => write!(f, "connection_exception"),
-      DBErrorType::Privileges => write!(f, "insufficient_privilege"),
-      DBErrorType::Internal => write!(f, "internal_error"),
-    }
-  }
-}
+use crate::models::errors::{AppError, ErrorType, InternalError};
 
 #[derive(Debug)]
 pub struct DBError {
-  pub err_type: DBErrorType,
+  pub err_type: ErrorType,
   pub err: Box<dyn Error + Send + Sync>,
   pub msg: String,
   pub path: String,
@@ -71,9 +42,17 @@ impl fmt::Display for DBError {
   }
 }
 
+impl From<InternalError> for DBError {
+  fn from(e: InternalError) -> Self {
+    DBError { err_type: e.err_type, err: e.err, msg: e.msg, path: e.path, details: "".into() }
+  }
+}
+
+impl Error for DBError {}
+
 impl DBError {
   pub fn new(
-    err_type: DBErrorType,
+    err_type: ErrorType,
     err: Box<dyn Error + Send + Sync>,
     msg: impl Into<String>,
     path: impl Into<String>,
@@ -124,26 +103,26 @@ pub fn handle_db_error(err: SqlxError, path: &str) -> DBError {
       };
 
       let err_type = match pg_err.code() {
-        "23505" => DBErrorType::UniqueViolation,
-        "23503" => DBErrorType::ForeignKeyViolation,
-        "23502" => DBErrorType::NotNullViolation,
-        "08000" | "08003" | "08006" => DBErrorType::Connection,
-        "42501" => DBErrorType::Privileges,
-        _ => DBErrorType::Internal,
+        "23505" => ErrorType::UniqueViolation,
+        "23503" => ErrorType::ForeignKeyViolation,
+        "23502" => ErrorType::NotNullViolation,
+        "08000" | "08003" | "08006" => ErrorType::Connection,
+        "42501" => ErrorType::Privileges,
+        _ => ErrorType::Internal,
       };
 
       DBError::new(err_type, Box::new(SqlxError::Database(db_err)), msg, path, details)
     }
 
     SqlxError::RowNotFound => DBError::new(
-      DBErrorType::NoRows,
+      ErrorType::NoRows,
       Box::new(SqlxError::RowNotFound),
       "the requested resource is not found",
       path,
       "",
     ),
 
-    _ => DBError::new(DBErrorType::Internal, Box::new(err), "database error", path, ""),
+    _ => DBError::new(ErrorType::Internal, Box::new(err), "database error", path, ""),
   }
 }
 

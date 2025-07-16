@@ -6,8 +6,10 @@ use tonic::Request;
 
 use crate::{
   common::main::Common,
-  models::context::Context,
-  models::errors::{app_error_from_proto_app_error, InternalError},
+  models::{
+    context::Context,
+    errors::{app_error_from_proto_app_error, ErrorType, InternalError},
+  },
 };
 
 impl Common {
@@ -17,6 +19,7 @@ impl Common {
     let err_msg = "failed to get configurations from common service";
     let mk_err = |msg: &str, err: Box<dyn Error + Send + Sync>| {
       Box::new(InternalError {
+        err_type: ErrorType::Internal,
         temp: false,
         err,
         msg: msg.into(),

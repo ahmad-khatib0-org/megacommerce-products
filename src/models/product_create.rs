@@ -1,7 +1,7 @@
 use std::{
   collections::{HashMap, HashSet},
   fmt::Display,
-  sync::Arc,
+  sync::{Arc, RwLockReadGuard},
 };
 
 use megacommerce_proto::{Product, ProductCreateRequest, ProductCreateTag, ProductTag};
@@ -26,7 +26,7 @@ use super::products::ProductStatus;
 pub fn products_create_is_valid(
   ctx: Arc<Context>,
   product: &ProductCreateRequest,
-  existing_tags: Arc<Vec<ProductTag>>,
+  existing_tags: RwLockReadGuard<'_, Vec<ProductTag>>,
 ) -> Result<(), AppError> {
   let ProductCreateRequest { title, description, currency_code, sku, tags, price, ar_enabled } =
     product;
@@ -162,7 +162,7 @@ fn error_builder<T: Display>(
 }
 
 fn check_if_tags_exist(
-  existing: Arc<Vec<ProductTag>>,
+  existing: RwLockReadGuard<'_, Vec<ProductTag>>,
   incoming: &Vec<ProductCreateTag>,
 ) -> Result<(), ProductCreateTag> {
   let existing_tags: HashSet<u32> = existing.iter().filter_map(|t| t.id).collect();

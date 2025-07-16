@@ -2,7 +2,10 @@ use std::{error::Error, sync::Arc, time::Duration};
 
 use sqlx::postgres::PgPoolOptions;
 
-use crate::{models::errors::InternalError, server::Server};
+use crate::{
+  models::errors::{ErrorType, InternalError},
+  server::Server,
+};
 
 impl Server {
   pub(super) async fn init_database(&mut self) -> Result<(), Box<dyn Error>> {
@@ -17,6 +20,7 @@ impl Server {
       .await
       .map_err(|e| InternalError {
         temp: false,
+        err_type: ErrorType::DBConnectionError,
         err: Box::new(e),
         msg: "failed to connect to database".into(),
         path: "products.server.init_database".into(),

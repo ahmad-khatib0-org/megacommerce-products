@@ -13,9 +13,9 @@ use tokio::sync::Mutex;
 use crate::common::main::{Common, CommonArgs};
 use crate::controller::{Controller, ControllerArgs};
 use crate::models::config::Config as ServiceConfig;
-use crate::models::errors::InternalError;
+use crate::models::errors::{ErrorType, InternalError};
 use crate::models::trans::translations_init;
-use crate::store::cache::Cache;
+use crate::store::cache::{Cache, CacheArgs};
 use crate::store::database::dbstore::{ProductsStoreImpl, ProductsStoreImplArgs};
 
 pub struct Server {
@@ -72,6 +72,7 @@ impl Server {
   pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
     let mk_err = |msg: &str, e: Box<dyn Error + Sync + Send>| InternalError {
       temp: false,
+      err_type: ErrorType::Internal,
       err: e,
       msg: msg.to_string(),
       path: "products.server.run".into(),
@@ -79,7 +80,9 @@ impl Server {
 
     self.init_database().await?;
 
-    let cache = Arc::new(Cache::new().await.map_err(|e| mk_err("failed to initialize cache", e))?);
+    let cache_args = CacheArgs { db: self.db.as_ref().unwrap().clone() };
+    let cache =
+      Arc::new(Cache::new(cache_args).await.map_err(|e| mk_err("failed to initialize cache", e))?);
 
     let store_args = ProductsStoreImplArgs { db: self.db.as_ref().unwrap().clone() };
     let store = Arc::new(ProductsStoreImpl::new(store_args));

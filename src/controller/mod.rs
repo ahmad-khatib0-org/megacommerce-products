@@ -1,6 +1,8 @@
 mod audit;
 mod middleware;
 mod product_create;
+mod product_data;
+mod router;
 
 use std::{error::Error, net::SocketAddr, sync::Arc};
 
@@ -11,7 +13,7 @@ use tracing::info;
 
 use crate::{
   controller::middleware::context_middleware,
-  models::errors::InternalError,
+  models::errors::{ErrorType, InternalError},
   store::{cache::Cache, database::ProductsStore},
   utils::net::validate_url_target,
 };
@@ -41,6 +43,7 @@ impl Controller {
     let url = srv.products_service_grpc_url();
     validate_url_target(url).map_err(|e| {
       Box::new(InternalError {
+        err_type: ErrorType::Internal,
         err: Box::new(e),
         temp: false,
         msg: "failed to run products service server".into(),

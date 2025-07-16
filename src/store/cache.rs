@@ -1,20 +1,35 @@
-use std::{error::Error, sync::Arc};
+mod categories;
+mod tags;
 
-use megacommerce_proto::ProductTag;
+use std::{
+  error::Error,
+  sync::{Arc, RwLock},
+  vec,
+};
 
-#[derive(Debug, Clone)]
+use megacommerce_proto::{ProductCategory, ProductTag};
+use sqlx::{Pool, Postgres};
+
+#[derive(Debug)]
 pub struct Cache {
-  tags: Arc<Vec<ProductTag>>,
+  tags: RwLock<Vec<ProductTag>>,
+  categories: RwLock<Vec<ProductCategory>>,
+  db: Arc<Pool<Postgres>>,
+}
+
+#[derive(Debug)]
+pub struct CacheArgs {
+  pub db: Arc<Pool<Postgres>>,
 }
 
 impl Cache {
-  pub async fn new() -> Result<Self, Box<dyn Error + Send + Sync>> {
-    let cache = Self { tags: Arc::new(vec![]) };
+  pub async fn new(args: CacheArgs) -> Result<Self, Box<dyn Error + Send + Sync>> {
+    let mut cache =
+      Self { tags: RwLock::new(vec![]), categories: RwLock::new(vec![]), db: args.db };
+
+    cache.tags_init().await?;
+    cache.categories_init().await?;
 
     Ok(cache)
-  }
-
-  pub fn tags(&self) -> Arc<Vec<ProductTag>> {
-    self.tags.clone()
   }
 }

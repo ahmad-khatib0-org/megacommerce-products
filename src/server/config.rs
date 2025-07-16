@@ -2,13 +2,17 @@ use std::error::Error;
 use std::fs;
 
 use crate::{
-  models::{config::Config, errors::InternalError},
+  models::{
+    config::Config,
+    errors::{ErrorType, InternalError},
+  },
   server::Server,
 };
 
 impl Server {
   pub(crate) async fn init_service_config(&self) -> Result<(), Box<dyn Error>> {
     let yaml_string = fs::read_to_string("config.yaml").map_err(|e| InternalError {
+      err_type: ErrorType::ConfigError,
       temp: false,
       msg: "failed to load service config file".into(),
       path: "products.server.load_service_config".into(),
@@ -17,6 +21,7 @@ impl Server {
 
     let parsed_config: Config = serde_yaml::from_str(&yaml_string).map_err(|e| InternalError {
       temp: false,
+      err_type: ErrorType::ConfigError,
       msg: "failed to parse config data".into(),
       path: "products.server.load_service_config".into(),
       err: Box::new(e),
