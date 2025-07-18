@@ -6,7 +6,11 @@ use sqlx::query;
 use crate::store::{cache::Cache, database::errors::handle_db_error};
 
 impl Cache {
-  pub fn tags(&self) -> RwLockReadGuard<'_, Vec<ProductTag>> {
+  pub fn tags(&self) -> Vec<ProductTag> {
+    self.tags.read().unwrap().clone()
+  }
+
+  pub fn tags_as_ref(&self) -> RwLockReadGuard<'_, Vec<ProductTag>> {
     self.tags.read().unwrap()
   }
 

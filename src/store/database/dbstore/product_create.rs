@@ -5,20 +5,17 @@ use bigdecimal::BigDecimal;
 use megacommerce_proto::Product;
 use serde_json::{to_value, Value};
 
+use crate::models::errors::ErrorType;
 use crate::{
   models::context::Context,
-  store::database::{
-    dbstore::ProductsStoreImpl,
-    errors::{DBError, DBErrorType},
-    ProductsStore,
-  },
+  store::database::{dbstore::ProductsStoreImpl, errors::DBError, ProductsStore},
 };
 
 #[tonic::async_trait]
 impl ProductsStore for ProductsStoreImpl {
   async fn product_create(&self, _: Arc<Context>, pro: &Product) -> Result<(), DBError> {
     let mk_err = |msg: &str, err: Box<dyn Error + Sync + Send>| DBError {
-      err_type: DBErrorType::JsonMarshal,
+      err_type: ErrorType::JsonMarshal,
       err: err,
       msg: msg.into(),
       path: "products.store.product_create".into(),

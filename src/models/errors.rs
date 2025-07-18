@@ -2,12 +2,16 @@ use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 
 use derive_more::Display;
 use megacommerce_proto::{AppError as AppErrorProto, NestedStringMap, StringMap};
+use serde_json::Value;
 use tonic::Code;
 
 use crate::models::{
   context::Context,
   trans::{tr, TranslateFunc},
 };
+
+pub type OptionalError = Option<Box<dyn Error + Sync + Send>>;
+pub type OptionalParams = Option<HashMap<String, Value>>;
 
 const MAX_ERROR_LENGTH: usize = 1024;
 const NO_TRANSLATION: &str = "<untranslated>";
@@ -69,7 +73,7 @@ pub struct AppError {
   pub detailed_error: String,
   pub request_id: Option<String>,
   pub status_code: Option<i32>,
-  pub tr_params: Option<HashMap<String, serde_json::Value>>,
+  pub tr_params: OptionalParams,
   pub params: HashMap<String, String>,
   pub nested_params: HashMap<String, HashMap<String, String>>,
   pub where_: String,
@@ -82,7 +86,7 @@ impl AppError {
     ctx: Arc<Context>,
     where_: impl Into<String>,
     id: impl Into<String>,
-    tr_params: Option<HashMap<String, serde_json::Value>>,
+    tr_params: OptionalParams,
     details: impl Into<String>,
     status_code: Option<i32>,
     error: Option<Box<dyn Error + Send + Sync>>,
