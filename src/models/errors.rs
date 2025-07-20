@@ -2,6 +2,7 @@ use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 
 use derive_more::Display;
 use megacommerce_proto::{AppError as AppErrorProto, NestedStringMap, StringMap};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tonic::Code;
 
@@ -11,12 +12,15 @@ use crate::models::{
 };
 
 pub type OptionalError = Option<Box<dyn Error + Sync + Send>>;
+pub type BoxedError = Box<dyn Error + Sync + Send>;
 pub type OptionalParams = Option<HashMap<String, Value>>;
 
 const MAX_ERROR_LENGTH: usize = 1024;
 const NO_TRANSLATION: &str = "<untranslated>";
+pub const MSG_ID_ERR_INTERNAL: &str = "server.internal.error";
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ErrorType {
   NoRows,
   UniqueViolation,
@@ -50,7 +54,7 @@ impl fmt::Display for ErrorType {
 }
 
 #[derive(Debug, Display)]
-#[display("InternalError: {} {} {} {}", temp, err, msg, path)]
+#[display("InternalError: {temp} {err} {msg} {path}")]
 pub struct InternalError {
   pub temp: bool,
   pub err: Box<dyn Error + Send + Sync>,
@@ -218,7 +222,7 @@ impl AppError {
     Self::new(
       ctx,
       path,
-      "server.internal.error",
+      MSG_ID_ERR_INTERNAL,
       None,
       self.detailed_error,
       Some(Code::Internal.into()),

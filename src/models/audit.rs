@@ -15,6 +15,7 @@ pub enum EventName {
 }
 
 #[derive(Serialize, Deserialize, Debug, Display, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum EventParameterKey {
   ProductCreate,
 }
@@ -36,13 +37,7 @@ pub enum EventStatus {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Display, Default)]
-#[display(
-  "AuditEventData: {:?} {:?} {:?} {}",
-  parameters,
-  prior_state,
-  resulting_state,
-  object_type
-)]
+#[display("AuditEventData: {parameters:?} {prior_state:?} {resulting_state:?} {object_type}")]
 pub struct AuditEventData {
   pub parameters: AnyMap,
   pub prior_state: AnyMap,
@@ -76,7 +71,7 @@ impl fmt::Display for EventError {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Display)]
-#[display("AuditRecord: {event_name} {status} {event} {actor} {:?}", meta)]
+#[display("AuditRecord: {event_name} {status} {event} {actor} {meta:?}")]
 pub struct AuditRecord {
   pub event_name: EventName,
   pub status: EventStatus,

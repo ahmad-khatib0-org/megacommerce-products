@@ -1,7 +1,9 @@
 mod audit;
+mod helpers;
 mod middleware;
 mod product_create;
 mod product_data;
+mod product_list;
 mod router;
 
 use std::{error::Error, net::SocketAddr, sync::Arc};

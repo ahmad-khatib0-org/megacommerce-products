@@ -1,8 +1,10 @@
+mod product_create;
+mod product_list;
+mod router;
+
 use std::sync::Arc;
 
 use sqlx::{Pool, Postgres};
-
-mod product_create;
 
 #[derive(Debug)]
 pub struct ProductsStoreImpl {

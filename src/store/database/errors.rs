@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tonic::Code;
 
 use crate::models::context::Context;
-use crate::models::errors::{AppError, ErrorType, InternalError};
+use crate::models::errors::{AppError, ErrorType, InternalError, MSG_ID_ERR_INTERNAL};
 
 #[derive(Debug)]
 pub struct DBError {
@@ -65,7 +65,7 @@ impl DBError {
     AppError::new(
       ctx,
       path,
-      "server.internal.error",
+      MSG_ID_ERR_INTERNAL,
       None,
       self.details,
       Some(Code::Internal.into()),

@@ -7,12 +7,7 @@ pub struct Config {
 }
 
 #[derive(Clone, Debug, Deserialize, Display)]
-#[display(
-  "ServiceConfig {} {} {}",
-  env,
-  service_grpc_url,
-  common_service_grpc_url
-)]
+#[display("ServiceConfig {env} {service_grpc_url} {common_service_grpc_url}")]
 pub struct ServiceConfig {
   pub env: String,
   pub service_grpc_url: String,
