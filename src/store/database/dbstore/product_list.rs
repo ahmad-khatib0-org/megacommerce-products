@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use bigdecimal::BigDecimal;
-use derive_more::Display;
 use megacommerce_proto::{ProductListItem, ProductListRequest};
 use sqlx::{postgres::PgRow, query, Error, Row};
 

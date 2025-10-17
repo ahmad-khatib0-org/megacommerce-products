@@ -16,14 +16,14 @@ impl Common {
   pub async fn translations_get(
     &mut self,
   ) -> Result<HashMap<String, TranslationElements>, Box<dyn Error>> {
-    let err_msg = "failed to get configurations from common service";
+    let err_msg = "failed to get translations from common service";
     let mk_err = |msg: &str, err: Box<dyn Error + Send + Sync>| {
       Box::new(InternalError {
         err_type: ErrorType::Internal,
         temp: false,
         err,
         msg: msg.into(),
-        path: "products.common.config_get".into(),
+        path: "products.common.translations_get".into(),
       })
     };
 

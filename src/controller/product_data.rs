@@ -20,6 +20,7 @@ pub(super) async fn product_data(
 ) -> Result<Response<ProductDataResponse>, Status> {
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let req = request.into_inner();
+  let lang = ctx.accept_language();
   let return_err =
     |e: AppError| Response::new(ProductDataResponse { response: Some(ResError(e.to_proto())) });
   let mk_err = |id: &str, p: OptionalParams, err: OptionalError| {
@@ -36,21 +37,21 @@ pub(super) async fn product_data(
 
   let mut res = ProductDataResponseData { ..Default::default() };
 
-  if req.get_all_categories.unwrap_or(false) {
-    res.categories = Some(c.cache.categories());
-  }
-
   if req.get_tags.unwrap_or(false) {
     res.tags = Some(ProductTags { tags: c.cache.tags() });
   }
 
-  if req.get_category_data.unwrap_or(false) {
-    let cat_name = req.category_name.unwrap_or_default();
-    if cat_name == "".to_string() {
+  if !req.subcategory.is_none() {
+    let sub = req.subcategory.as_ref().unwrap();
+    let cat_name = &sub.category;
+    let sub_name = &sub.subcategory;
+
+    println!("the categories: {} {} {}", cat_name, sub_name, lang);
+    if cat_name.is_empty() || sub_name.is_empty() {
       return Ok(return_err(mk_err("categories.missing_name.error", None, None)));
     }
-    if let Some(cat_data) = c.cache.category_data(&cat_name) {
-      res.category_data = Some(cat_data);
+    if let Some(sub) = c.cache.subcategory_data(cat_name, sub_name, lang) {
+      res.subcategory = Some(sub);
     } else {
       return Ok(return_err(mk_err("categories.not_found.error", None, None)));
     }

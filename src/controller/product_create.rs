@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use megacommerce_proto::{
-  product_create_response::Response::{Data, Error as ResError},
-  Empty, ProductCreateRequest, ProductCreateResponse,
+  product_create_response::Response::{Data as ResData, Error as ResError},
+  ProductCreateRequest, ProductCreateResponse, SuccessResponseData,
 };
 use tonic::{Request, Response, Status};
 
@@ -15,6 +15,7 @@ use crate::{
     product_create::{
       products_create_auditable, products_create_is_valid, products_create_pre_save,
     },
+    trans::tr,
   },
 };
 
@@ -45,5 +46,11 @@ pub(super) async fn product_create(
   }
 
   audit.success();
-  Ok(Response::new(ProductCreateResponse { response: Some(Data(Empty {})) }))
+
+  let message =
+    tr::<()>(ctx.accept_language(), "products.create.successfully", None).unwrap_or_default();
+
+  Ok(Response::new(ProductCreateResponse {
+    response: Some(ResData(SuccessResponseData { message: Some(message), ..Default::default() })),
+  }))
 }

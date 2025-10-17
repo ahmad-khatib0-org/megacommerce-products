@@ -1,21 +1,23 @@
 mod categories;
 mod tags;
 
-use std::{
-  collections::HashMap,
-  error::Error,
-  sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, error::Error, sync::Arc};
 
-use megacommerce_proto::{ProductCategoriesWithoutSubcategories, ProductCategory, ProductTag};
+use dashmap::DashMap;
+use megacommerce_proto::{Category, ProductTag, Subcategory, SubcategoryTranslations};
+use parking_lot::RwLock;
 use sqlx::{Pool, Postgres};
 
 #[derive(Debug)]
 pub struct Cache {
   db: Arc<Pool<Postgres>>,
   tags: RwLock<Vec<ProductTag>>,
-  categories: RwLock<HashMap<String, ProductCategory>>,
-  categories_without_subcategories: RwLock<ProductCategoriesWithoutSubcategories>,
+  categories: DashMap<String, Arc<Category>>,
+  /// category_id -> ( subcategory_id -> Arc<Subcategory> )
+  subcategories_data: DashMap<String, DashMap<String, Arc<Subcategory>>>,
+  /// (category_id, (subcategory_id , (language, SubcategoryTranslations)))
+  subcategories_translation:
+    DashMap<String, DashMap<String, DashMap<String, Arc<SubcategoryTranslations>>>>,
 }
 
 #[derive(Debug)]
@@ -28,10 +30,9 @@ impl Cache {
     let mut cache = Self {
       db: args.db,
       tags: RwLock::new(vec![]),
-      categories: RwLock::new(HashMap::new()),
-      categories_without_subcategories: RwLock::new(ProductCategoriesWithoutSubcategories {
-        categories: vec![],
-      }),
+      categories: DashMap::new(),
+      subcategories_data: DashMap::new(),
+      subcategories_translation: DashMap::new(),
     };
 
     cache.tags_init().await?;

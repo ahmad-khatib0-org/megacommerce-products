@@ -1,60 +1,89 @@
-use std::{collections::HashMap, error::Error};
+use std::{error::Error, sync::Arc};
 
+use dashmap::DashMap;
 use megacommerce_proto::{
-  ProductCategoriesWithoutSubcategories, ProductCategory, ProductCategoryWithoutSubcategories,
-  ProductSubcategory,
+  Category, CategoryTranslations, ProductDataResponseSubcategory, Subcategory,
+  SubcategoryTranslations,
 };
 use serde_json::from_value;
 use sqlx::query;
 
-use crate::{
-  models::errors::ErrorType,
-  store::{
-    cache::Cache,
-    database::errors::{handle_db_error, DBError},
-  },
-};
+use crate::store::{cache::Cache, database::errors::handle_db_error};
 
 impl Cache {
-  pub fn categories(&self) -> ProductCategoriesWithoutSubcategories {
-    self.categories_without_subcategories.read().unwrap().clone()
+  pub fn category_data(&self, category_name: &str) -> Option<Arc<Category>> {
+    self.categories.get(category_name).map(|cat| cat.value().clone())
   }
 
-  pub fn category_data(&self, category_name: &str) -> Option<ProductCategory> {
-    println!("the category is: {}", &category_name);
-    self.categories.read().unwrap().get(category_name).cloned()
+  pub fn subcategory_data(
+    &self,
+    category_name: &str,
+    subcategory_name: &str,
+    language: &str,
+  ) -> Option<ProductDataResponseSubcategory> {
+    let sub_guard = self.subcategories_data.get(category_name)?;
+    let sub_arc = sub_guard.get(subcategory_name)?.value().clone();
+
+    let lang_guard = self.subcategories_translation.get(category_name)?;
+    let subs_map_guard = lang_guard.get(language)?;
+    let trans_arc = subs_map_guard.get(subcategory_name)?.value().clone();
+
+    Some(ProductDataResponseSubcategory {
+      data: Some((*sub_arc).clone()),
+      translations: Some((*trans_arc).clone()),
+    })
   }
 
   pub(super) async fn categories_init(&self) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let rows = query!("SELECT id, name, subcategories FROM categories")
+    let rows = query!("SELECT id, name, image, subcategories, translations FROM categories")
       .fetch_all(self.db.as_ref())
       .await
       .map_err(|err| handle_db_error(err, "products.store.categories_init"))?;
 
-    let mut parsed_categories = HashMap::new();
-    let mut parsed_cats_without_sub = Vec::new();
+    // clear existing maps
+    self.categories.clear();
+    self.subcategories_data.clear();
+    self.subcategories_translation.clear();
 
     for c in rows {
-      let subcategories: Vec<ProductSubcategory> =
-        from_value(c.subcategories).map_err(|err| DBError {
-          err: Box::new(err),
-          msg: "failed to process subcategories of a category".into(),
-          path: "products.store.categories_init".into(),
-          details: "".into(),
-          err_type: ErrorType::JsonUnmarshal,
-        })?;
+      let subcategories: Vec<Subcategory> = from_value(c.subcategories)?; // error handling omitted
+      let translations: Vec<CategoryTranslations> = from_value(c.translations)?;
 
-      parsed_categories.insert(
-        c.id.clone(),
-        ProductCategory { id: c.id.clone(), name: c.name.clone(), subcategories },
-      );
+      // insert category
+      let cat = Arc::new(Category {
+        id: c.id.clone(),
+        name: c.name.clone(),
+        image: c.image.clone(),
+        translations: translations.clone(),
+        subcategories: subcategories.clone(),
+      });
+      self.categories.insert(c.id.clone(), cat);
 
-      parsed_cats_without_sub.push(ProductCategoryWithoutSubcategories { id: c.id, name: c.name });
+      // build inner dashmap for subcategories
+      let inner_sub = DashMap::new();
+      for s in &subcategories {
+        inner_sub.insert(s.id.clone(), Arc::new(s.clone()));
+      }
+      self.subcategories_data.insert(c.id.clone(), inner_sub);
+
+      // build translations: language -> ( sub_id -> Arc<SubcategoryTranslations> )
+      let langs_map = DashMap::new();
+      for tr in &translations {
+        let subs_map = DashMap::new();
+        for (sub_id, sub_tr) in &tr.subcategories {
+          subs_map.insert(
+            sub_id.clone(),
+            Arc::new(SubcategoryTranslations {
+              name: sub_tr.name.clone(),
+              attributes: sub_tr.attributes.clone(),
+              data: sub_tr.data.clone(),
+            }),
+          );
+        }
+        langs_map.insert(tr.language.clone(), subs_map);
+      }
+      self.subcategories_translation.insert(c.id.clone(), langs_map);
     }
-
-    *self.categories.write().unwrap() = parsed_categories;
-    *self.categories_without_subcategories.write().unwrap() =
-      ProductCategoriesWithoutSubcategories { categories: parsed_cats_without_sub };
 
     Ok(())
   }

@@ -212,8 +212,8 @@ impl AppError {
       status_code: self.status_code.unwrap_or(0) as i32,
       r#where: self.where_.clone(),
       skip_translation: self.skip_translation,
-      params: Some(StringMap { data: self.params.clone() }),
-      nested_params: Some(NestedStringMap { data: nested }),
+      errors: Some(StringMap { data: self.params.clone() }),
+      errors_nested: Some(NestedStringMap { data: nested }),
       request_id: self.request_id.clone().unwrap_or_default(),
     }
   }
@@ -238,10 +238,10 @@ pub fn convert_proto_params(
   let mut shallow = HashMap::new();
   let mut nested = HashMap::new();
 
-  if let Some(ref p) = ae.params {
+  if let Some(ref p) = ae.errors {
     shallow.extend(p.data.clone());
   }
-  if let Some(ref n) = ae.nested_params {
+  if let Some(ref n) = ae.errors_nested {
     for (k, v) in &n.data {
       nested.insert(k.clone(), v.data.clone());
     }
