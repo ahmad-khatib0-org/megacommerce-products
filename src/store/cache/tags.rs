@@ -1,10 +1,10 @@
-use std::error::Error;
-
 use megacommerce_proto::ProductTag;
+use megacommerce_shared::store::errors::handle_db_error;
 use parking_lot::RwLockReadGuard;
 use sqlx::query;
+use tower::BoxError;
 
-use crate::store::{cache::Cache, database::errors::handle_db_error};
+use crate::store::cache::Cache;
 
 impl Cache {
   pub fn tags(&self) -> Vec<ProductTag> {
@@ -15,7 +15,7 @@ impl Cache {
     self.tags.read()
   }
 
-  pub(super) async fn tags_init(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+  pub(super) async fn tags_init(&mut self) -> Result<(), BoxError> {
     let rows = query!(r#" SELECT id, name FROM tags "#)
       .fetch_all(self.db.as_ref())
       .await

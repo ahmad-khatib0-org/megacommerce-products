@@ -1,10 +1,11 @@
 mod categories;
 mod tags;
 
-use std::{collections::HashMap, error::Error, sync::Arc};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 use megacommerce_proto::{Category, ProductTag, Subcategory, SubcategoryTranslations};
+use megacommerce_shared::models::errors::BoxedErr;
 use parking_lot::RwLock;
 use sqlx::{Pool, Postgres};
 
@@ -26,7 +27,7 @@ pub struct CacheArgs {
 }
 
 impl Cache {
-  pub async fn new(args: CacheArgs) -> Result<Self, Box<dyn Error + Send + Sync>> {
+  pub async fn new(args: CacheArgs) -> Result<Self, BoxedErr> {
     let mut cache = Self {
       db: args.db,
       tags: RwLock::new(vec![]),

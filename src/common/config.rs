@@ -1,13 +1,12 @@
 use std::{error::Error, sync::Arc, time::Duration};
 
 use megacommerce_proto::{config_get_response, Config as SharedConfig, ConfigGetRequest};
-use tokio::time::timeout;
-use tonic::Request;
-
-use crate::models::{
+use megacommerce_shared::models::{
   context::Context,
   errors::{app_error_from_proto_app_error, ErrorType, InternalError},
 };
+use tokio::time::timeout;
+use tonic::Request;
 
 use super::main::Common;
 

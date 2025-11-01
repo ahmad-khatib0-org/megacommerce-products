@@ -1,31 +1,25 @@
 use std::error::Error;
 use std::fs;
 
-use crate::{
-  models::{
-    config::Config,
-    errors::{ErrorType, InternalError},
-  },
-  server::Server,
-};
+use megacommerce_shared::models::errors::{BoxedErr, ErrorType, InternalError};
+
+use crate::{models::config::Config, server::Server};
 
 impl Server {
   pub(crate) async fn init_service_config(&self) -> Result<(), Box<dyn Error>> {
-    let yaml_string = fs::read_to_string("config.yaml").map_err(|e| InternalError {
+    let ie = |err: BoxedErr, msg: &str| InternalError {
       err_type: ErrorType::ConfigError,
       temp: false,
-      msg: "failed to load service config file".into(),
+      msg: msg.into(),
       path: "products.server.load_service_config".into(),
-      err: Box::new(e),
-    })?;
+      err,
+    };
 
-    let parsed_config: Config = serde_yaml::from_str(&yaml_string).map_err(|e| InternalError {
-      temp: false,
-      err_type: ErrorType::ConfigError,
-      msg: "failed to parse config data".into(),
-      path: "products.server.load_service_config".into(),
-      err: Box::new(e),
-    })?;
+    let yaml_string = fs::read_to_string("config.yaml")
+      .map_err(|e| ie(Box::new(e), "failed to load service config file"))?;
+
+    let parsed_config: Config = serde_yaml::from_str(&yaml_string)
+      .map_err(|e| ie(Box::new(e), "failed to parse service config file"))?;
 
     let mut config = self.service_config.lock().await;
     *config = parsed_config;

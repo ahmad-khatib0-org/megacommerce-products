@@ -4,15 +4,13 @@ use megacommerce_proto::{
   product_data_response::Response::{Data, Error as ResError},
   ProductDataRequest, ProductDataResponse, ProductDataResponseData, ProductTags,
 };
+use megacommerce_shared::models::{
+  context::Context,
+  errors::{AppError, AppErrorErrors, OptionalParams},
+};
 use tonic::{Code, Request, Response, Status};
 
-use crate::{
-  controller::Controller,
-  models::{
-    context::Context,
-    errors::{AppError, OptionalError, OptionalParams},
-  },
-};
+use crate::controller::Controller;
 
 pub(super) async fn product_data(
   c: &Controller,
@@ -23,16 +21,9 @@ pub(super) async fn product_data(
   let lang = ctx.accept_language();
   let return_err =
     |e: AppError| Response::new(ProductDataResponse { response: Some(ResError(e.to_proto())) });
-  let mk_err = |id: &str, p: OptionalParams, err: OptionalError| {
-    AppError::new(
-      ctx.clone(),
-      "products.controller.product_data",
-      id,
-      p,
-      "",
-      Some(Code::InvalidArgument.into()),
-      err,
-    )
+  let mk_err = |id: &str, p: OptionalParams, err: Option<AppErrorErrors>| {
+    let path = "products.controller.product_data";
+    AppError::new(ctx.clone(), path, id, p, "", Code::InvalidArgument.into(), err)
   };
 
   let mut res = ProductDataResponseData { ..Default::default() };
@@ -46,7 +37,6 @@ pub(super) async fn product_data(
     let cat_name = &sub.category;
     let sub_name = &sub.subcategory;
 
-    println!("the categories: {} {} {}", cat_name, sub_name, lang);
     if cat_name.is_empty() || sub_name.is_empty() {
       return Ok(return_err(mk_err("categories.missing_name.error", None, None)));
     }

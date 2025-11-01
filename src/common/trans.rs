@@ -1,23 +1,21 @@
 use std::{collections::HashMap, error::Error, sync::Arc, time::Duration};
 
 use megacommerce_proto::{TranslationElements, TranslationsGetRequest};
+use megacommerce_shared::models::{
+  context::Context,
+  errors::{app_error_from_proto_app_error, BoxedErr, ErrorType, InternalError},
+};
 use tokio::time::timeout;
 use tonic::Request;
 
-use crate::{
-  common::main::Common,
-  models::{
-    context::Context,
-    errors::{app_error_from_proto_app_error, ErrorType, InternalError},
-  },
-};
+use crate::common::main::Common;
 
 impl Common {
   pub async fn translations_get(
     &mut self,
   ) -> Result<HashMap<String, TranslationElements>, Box<dyn Error>> {
     let err_msg = "failed to get translations from common service";
-    let mk_err = |msg: &str, err: Box<dyn Error + Send + Sync>| {
+    let mk_err = |msg: &str, err: BoxedErr| {
       Box::new(InternalError {
         err_type: ErrorType::Internal,
         temp: false,

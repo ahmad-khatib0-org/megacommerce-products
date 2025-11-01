@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
+use megacommerce_shared::models::{context::Context, errors::AppError};
 use tonic::Code;
 use ulid::Ulid;
-
-use crate::models::{context::Context, errors::AppError};
 
 pub(super) fn check_last_id(
   ctx: Arc<Context>,
@@ -12,7 +11,7 @@ pub(super) fn check_last_id(
   last_id: &str,
 ) -> Result<(), AppError> {
   let mk_err =
-    |id: &str| AppError::new(ctx, _where, id, None, "", Some(Code::InvalidArgument.into()), None);
+    |id: &str| AppError::new(ctx, _where, id, None, "", Code::InvalidArgument.into(), None);
 
   if *page > 1 && last_id == "" {
     return Err(mk_err("request.last_id.missing"));

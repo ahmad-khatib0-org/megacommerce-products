@@ -1,20 +1,18 @@
 use std::{error::Error, time::Duration};
 
 use megacommerce_proto::{common_service_client::CommonServiceClient, PingRequest};
+use megacommerce_shared::models::errors::{BoxedErr, ErrorType, InternalError};
 use tokio::time::timeout;
 use tonic::{transport::Channel, Request};
 
 use super::main::Common;
-use crate::{
-  models::errors::{ErrorType, InternalError},
-  utils::net::validate_url_target,
-};
+use crate::utils::net::validate_url_target;
 
 impl Common {
   pub(super) async fn init_common_client(
     &mut self,
   ) -> Result<CommonServiceClient<Channel>, Box<dyn Error>> {
-    let mk_err = |msg: &str, err: Box<dyn Error + Send + Sync>| {
+    let mk_err = |msg: &str, err: BoxedErr| {
       Box::new(InternalError {
         err_type: ErrorType::Internal,
         temp: false,

@@ -4,15 +4,13 @@ use megacommerce_proto::{
   product_list_response::Response::{Data, Error as ResError},
   ProductListRequest, ProductListResponse, ProductListResponseData,
 };
+use megacommerce_shared::models::{
+  context::Context,
+  errors::{AppError, AppErrorErrors, OptionalParams, MSG_ID_ERR_INTERNAL},
+};
 use tonic::{Code, Request, Response, Status};
 
-use crate::{
-  controller::{helpers::check_last_id, Controller},
-  models::{
-    context::Context,
-    errors::{AppError, OptionalError, OptionalParams, MSG_ID_ERR_INTERNAL},
-  },
-};
+use crate::controller::{helpers::check_last_id, Controller};
 
 pub(super) async fn product_list(
   c: &Controller,
@@ -24,8 +22,8 @@ pub(super) async fn product_list(
   let w = "products.controller.product_list";
   let return_err =
     |e: AppError| Response::new(ProductListResponse { response: Some(ResError(e.to_proto())) });
-  let mk_err = |id: &str, p: OptionalParams, err: OptionalError, code: Option<Code>| {
-    AppError::new(ctx.clone(), w, id, p, "", Some(code.unwrap_or(Code::Internal).into()), err)
+  let ie = |id: &str, p: OptionalParams, err: Option<AppErrorErrors>, code: Option<Code>| {
+    AppError::new(ctx.clone(), w, id, p, "", code.unwrap_or(Code::Internal).into(), err)
   };
 
   let mut res = ProductListResponseData { ..Default::default() };
@@ -35,7 +33,12 @@ pub(super) async fn product_list(
 
   let res_db = c.store.product_list(ctx.clone(), &req).await;
   if let Err(err) = res_db {
-    return Ok(return_err(mk_err(MSG_ID_ERR_INTERNAL, None, Some(Box::new(err)), None)));
+    return Ok(return_err(ie(
+      MSG_ID_ERR_INTERNAL,
+      None,
+      Some(AppErrorErrors { err: Some(Box::new(err)), ..Default::default() }),
+      None,
+    )));
   } else {
     res.data = res_db.unwrap()
   }

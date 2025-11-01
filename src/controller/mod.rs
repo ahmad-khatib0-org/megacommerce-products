@@ -1,6 +1,5 @@
 mod audit;
 mod helpers;
-mod middleware;
 mod product_create;
 mod product_data;
 mod product_list;
@@ -9,13 +8,15 @@ mod router;
 use std::{error::Error, net::SocketAddr, sync::Arc};
 
 use megacommerce_proto::{products_service_server::ProductsServiceServer, Config as SharedConfig};
+use megacommerce_shared::{
+  models::errors::{ErrorType, InternalError},
+  utils::middleware::middleware_context,
+};
 use tonic::{service::InterceptorLayer, transport::Server as GrpcServer};
 use tower::ServiceBuilder;
 use tracing::info;
 
 use crate::{
-  controller::middleware::context_middleware,
-  models::errors::{ErrorType, InternalError},
   store::{cache::Cache, database::ProductsStore},
   utils::net::validate_url_target,
 };
@@ -53,10 +54,7 @@ impl Controller {
       })
     })?;
 
-    let layer = ServiceBuilder::new()
-      // .layer(InterceptorLayer::new(auth_middleware))
-      .layer(InterceptorLayer::new(context_middleware))
-      .into_inner();
+    let layer = ServiceBuilder::new().layer(InterceptorLayer::new(middleware_context)).into_inner();
 
     info!("products service server is running on: {}", url);
     GrpcServer::builder()

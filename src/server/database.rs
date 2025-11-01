@@ -1,11 +1,9 @@
 use std::{error::Error, sync::Arc, time::Duration};
 
+use megacommerce_shared::models::errors::{ErrorType, InternalError};
 use sqlx::postgres::PgPoolOptions;
 
-use crate::{
-  models::errors::{ErrorType, InternalError},
-  server::Server,
-};
+use crate::server::Server;
 
 impl Server {
   pub(super) async fn init_database(&mut self) -> Result<(), Box<dyn Error>> {

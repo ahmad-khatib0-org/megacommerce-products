@@ -2,22 +2,23 @@ use std::sync::Arc;
 
 use bigdecimal::BigDecimal;
 use megacommerce_proto::{ProductListItem, ProductListRequest};
-use sqlx::{postgres::PgRow, query, Error, Row};
-
-use crate::{
+use megacommerce_shared::{
   models::{
     context::Context,
-    errors::{BoxedError, ErrorType},
+    errors::{BoxedErr, ErrorType},
   },
-  store::database::{dbstore::ProductsStoreImpl, errors::DBError},
+  store::errors::DBError,
 };
+use sqlx::{postgres::PgRow, query, Error, Row};
+
+use crate::store::database::dbstore::ProductsStoreImpl;
 
 pub(super) async fn product_list(
   s: &ProductsStoreImpl,
   _ctx: Arc<Context>,
   request: &ProductListRequest,
 ) -> Result<Vec<ProductListItem>, DBError> {
-  let mk_err = |msg: Option<&str>, err: BoxedError| DBError {
+  let mk_err = |msg: Option<&str>, err: BoxedErr| DBError {
     err_type: ErrorType::Internal,
     err,
     msg: msg.unwrap_or("failed to query products").into(),

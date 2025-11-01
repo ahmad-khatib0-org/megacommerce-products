@@ -1,14 +1,15 @@
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 use megacommerce_proto::{
   Category, CategoryTranslations, ProductDataResponseSubcategory, Subcategory,
   SubcategoryTranslations,
 };
+use megacommerce_shared::{models::errors::BoxedErr, store::errors::handle_db_error};
 use serde_json::from_value;
 use sqlx::query;
 
-use crate::store::{cache::Cache, database::errors::handle_db_error};
+use crate::store::cache::Cache;
 
 impl Cache {
   pub fn category_data(&self, category_name: &str) -> Option<Arc<Category>> {
@@ -34,7 +35,7 @@ impl Cache {
     })
   }
 
-  pub(super) async fn categories_init(&self) -> Result<(), Box<dyn Error + Sync + Send>> {
+  pub(super) async fn categories_init(&self) -> Result<(), BoxedErr> {
     let rows = query!("SELECT id, name, image, subcategories, translations FROM categories")
       .fetch_all(self.db.as_ref())
       .await
@@ -46,8 +47,12 @@ impl Cache {
     self.subcategories_translation.clear();
 
     for c in rows {
+      println!("category id: {}", c.id);
       let subcategories: Vec<Subcategory> = from_value(c.subcategories)?; // error handling omitted
+
+      println!("after subcategories");
       let translations: Vec<CategoryTranslations> = from_value(c.translations)?;
+      println!("after translations");
 
       // insert category
       let cat = Arc::new(Category {
@@ -77,6 +82,7 @@ impl Cache {
               name: sub_tr.name.clone(),
               attributes: sub_tr.attributes.clone(),
               data: sub_tr.data.clone(),
+              safety: sub_tr.safety.clone(),
             }),
           );
         }

@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
 use megacommerce_proto::{Product, ProductListItem, ProductListRequest};
+use megacommerce_shared::{models::context::Context, store::errors::DBError};
 
-use crate::{
-  models::context::Context,
-  store::database::{
-    dbstore::{product_create::product_create, product_list::product_list, ProductsStoreImpl},
-    errors::DBError,
-    ProductsStore,
-  },
+use crate::store::database::{
+  dbstore::{product_create::product_create, product_list::product_list, ProductsStoreImpl},
+  ProductsStore,
 };
 
 #[tonic::async_trait]

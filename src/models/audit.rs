@@ -1,10 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, fmt, sync::Arc};
 
 use derive_more::Display;
+use megacommerce_shared::models::context::Context;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-use super::context::Context;
 
 pub type AnyMap = HashMap<String, Value>;
 

@@ -1,24 +1,23 @@
+use std::str::FromStr;
 use std::sync::Arc;
-use std::{error::Error, str::FromStr};
 
 use bigdecimal::BigDecimal;
 use megacommerce_proto::Product;
+use megacommerce_shared::models::context::Context;
+use megacommerce_shared::models::errors::{BoxedErr, ErrorType};
+use megacommerce_shared::store::errors::DBError;
 use serde_json::{to_value, Value};
 
-use crate::models::errors::ErrorType;
-use crate::{
-  models::context::Context,
-  store::database::{dbstore::ProductsStoreImpl, errors::DBError},
-};
+use crate::store::database::dbstore::ProductsStoreImpl;
 
 pub(super) async fn product_create(
   s: &ProductsStoreImpl,
   _: Arc<Context>,
   pro: &Product,
 ) -> Result<(), DBError> {
-  let mk_err = |msg: &str, err: Box<dyn Error + Sync + Send>| DBError {
+  let mk_err = |msg: &str, err: BoxedErr| DBError {
     err_type: ErrorType::JsonMarshal,
-    err: err,
+    err,
     msg: msg.into(),
     path: "products.store.product_create".into(),
     details: "".into(),
