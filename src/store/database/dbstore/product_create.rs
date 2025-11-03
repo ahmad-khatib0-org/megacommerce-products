@@ -36,7 +36,7 @@ pub(super) async fn product_create(
     .transpose()
     .map_err(|e| mk_err("failed to serialize the products metadata", Box::new(e)))?;
 
-  let db = &s.db;
+  let db = &*s.db.get().await;
 
   sqlx::query(
     r#"
@@ -69,7 +69,7 @@ pub(super) async fn product_create(
   .bind(pro.created_at as i64)
   .bind(pro.published_at.map(|t| t as i64))
   .bind(pro.updated_at.map(|t| t as i64))
-  .execute(db.as_ref())
+  .execute(db)
   .await
   .map_err(|e| mk_err("failed to insert a product", Box::new(e)))?;
 

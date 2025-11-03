@@ -2,12 +2,13 @@ use std::{error::Error, sync::Arc, time::Duration};
 
 use megacommerce_shared::models::errors::{ErrorType, InternalError};
 use sqlx::postgres::PgPoolOptions;
+use tokio::sync::RwLock;
 
 use crate::server::Server;
 
 impl Server {
   pub(super) async fn init_database(&mut self) -> Result<(), Box<dyn Error>> {
-    let cfg = self.shared_config.lock().await.sql.clone().unwrap();
+    let cfg = self.shared_config.read().await.sql.clone().unwrap();
 
     let db = PgPoolOptions::new()
       .max_connections(cfg.max_open_conns().clone() as u32)
@@ -24,7 +25,7 @@ impl Server {
         path: "products.server.init_database".into(),
       })?;
 
-    self.db = Some(Arc::new(db));
+    self.db = Some(Arc::new(RwLock::new(db)));
 
     Ok(())
   }

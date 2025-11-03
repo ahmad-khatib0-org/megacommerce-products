@@ -9,7 +9,10 @@ use std::{error::Error, net::SocketAddr, sync::Arc};
 
 use megacommerce_proto::{products_service_server::ProductsServiceServer, Config as SharedConfig};
 use megacommerce_shared::{
-  models::errors::{ErrorType, InternalError},
+  models::{
+    errors::{ErrorType, InternalError},
+    r_lock::RLock,
+  },
   utils::middleware::middleware_context,
 };
 use tonic::{service::InterceptorLayer, transport::Server as GrpcServer};
@@ -23,14 +26,14 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Controller {
-  pub(super) cfg: SharedConfig,
+  pub(super) cfg: RLock<SharedConfig>,
   pub(super) cache: Arc<Cache>,
   pub(super) store: Arc<dyn ProductsStore + Send + Sync>,
 }
 
 #[derive(Debug)]
 pub struct ControllerArgs {
-  pub cfg: SharedConfig,
+  pub cfg: RLock<SharedConfig>,
   pub cache: Arc<Cache>,
   pub store: Arc<dyn ProductsStore + Send + Sync>,
 }
@@ -41,7 +44,7 @@ impl Controller {
   }
 
   pub async fn run(self) -> Result<(), Box<dyn Error>> {
-    let srv = self.cfg.services.as_ref().unwrap().clone();
+    let srv = self.cfg.get().await.services.as_ref().unwrap().clone();
 
     let url = srv.products_service_grpc_url();
     validate_url_target(url).map_err(|e| {

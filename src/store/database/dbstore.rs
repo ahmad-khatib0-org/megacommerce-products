@@ -2,18 +2,17 @@ mod product_create;
 mod product_list;
 mod router;
 
-use std::sync::Arc;
-
+use megacommerce_shared::models::r_lock::RLock;
 use sqlx::{Pool, Postgres};
 
 #[derive(Debug)]
 pub struct ProductsStoreImpl {
-  pub(crate) db: Arc<Pool<Postgres>>,
+  pub(crate) db: RLock<Pool<Postgres>>,
 }
 
 #[derive(Debug)]
 pub struct ProductsStoreImplArgs {
-  pub db: Arc<Pool<Postgres>>,
+  pub db: RLock<Pool<Postgres>>,
 }
 
 impl ProductsStoreImpl {

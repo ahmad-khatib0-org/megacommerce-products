@@ -13,14 +13,16 @@ pub static PRODUCT_SKU_MIN_LENGTH: usize = 3;
 pub static PRODUCT_SKU_MAX_LENGTH: usize = 60;
 pub static PRODUCT_BRAND_NAME_MIN_LENGTH: usize = 3;
 pub static PRODUCT_BRAND_NAME_MAX_LENGTH: usize = 60;
-pub static PRODUCT_MIN_IMAGES_COUNT: usize = 1;
-pub static PRODUCT_MAX_IMAGES_COUNT: usize = 10;
-pub const PRODUCT_MINIMUM_INVENTORY_QUANTITY: i32 = 1;
+pub const PRODUCT_MINIMUM_INVENTORY_QUANTITY: u64 = 1;
 pub const PRODUCT_OFFERING_CONDITION_NOTE_MIN_LENGTH: usize = 5;
 pub const PRODUCT_OFFERING_CONDITION_NOTE_MAX_LENGTH: usize = 255;
 pub const PRODUCT_MINIMUM_ORDER_MAX_OPTIONS: usize = 4;
+pub const PRODUCT_MINIMUM_ORDER_MIN_OPTIONS: usize = 1;
 pub const PRODUCT_VARIATION_TITLE_MIN_LENGTH: usize = 3;
 pub const PRODUCT_VARIATION_TITLE_MAX_LENGTH: usize = 32;
+pub static PRODUCT_MIN_IMAGES_COUNT: usize = 1;
+pub static PRODUCT_MAX_IMAGES_COUNT: usize = 10;
+pub static PRODUCT_MEDIA_MAX_ALLOWED_DIRECT_UPLOAD_SIZE_BYTES: usize = 1024 * 1024 * 40;
 pub static PRODUCT_IMAGE_ACCEPTED_TYPES: [&str; 4] =
   ["image/png", "image/webp", "image/jpeg", "image/jpg"];
 pub static PRODUCT_ID_TYPES: [&str; 4] = ["upc", "ean", "isbn", "gtin"];
@@ -31,11 +33,30 @@ pub enum ProductOfferingCondition {
 }
 
 impl ProductOfferingCondition {
-  pub fn as_str(&self) -> &'static str {
+  pub const ALL_STR: [&'static str; 2] = ["new", "used"];
+
+  pub fn as_slice() -> &'static [&'static str] {
+    &Self::ALL_STR
+  }
+
+  pub const fn as_str(&self) -> &'static str {
     match self {
       Self::New => "new",
       Self::Used => "used",
     }
+  }
+
+  pub fn from_str(value: &str) -> Self {
+    match value {
+      "new" => Self::New,
+      "used" => Self::Used,
+      _ => panic!("invalid value for ProductOfferingCondition"),
+    }
+  }
+
+  pub fn as_vec() -> Vec<&'static str> {
+    // manually list the variants
+    [Self::New, Self::Used].iter().map(|c| c.as_str()).collect()
   }
 }
 

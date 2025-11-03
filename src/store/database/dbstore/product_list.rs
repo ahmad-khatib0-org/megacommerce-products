@@ -41,11 +41,13 @@ pub(super) async fn product_list(
     _where,
   );
 
+  let pool = &*s.db.get().await;
   let result: Result<Vec<PgRow>, Error>;
+
   if request.page > 1 {
-    result = query(&sql).bind(request.last_id.clone()).fetch_all(s.db.as_ref()).await;
+    result = query(&sql).bind(request.last_id.clone()).fetch_all(pool).await;
   } else {
-    result = query(&sql).fetch_all(s.db.as_ref()).await;
+    result = query(&sql).fetch_all(pool).await;
   };
 
   if let Err(err) = result {

@@ -36,8 +36,9 @@ impl Cache {
   }
 
   pub(super) async fn categories_init(&self) -> Result<(), BoxedErr> {
+    let db = &*self.db.get().await;
     let rows = query!("SELECT id, name, image, subcategories, translations FROM categories")
-      .fetch_all(self.db.as_ref())
+      .fetch_all(db)
       .await
       .map_err(|err| handle_db_error(err, "products.store.categories_init"))?;
 

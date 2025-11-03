@@ -5,13 +5,13 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use megacommerce_proto::{Category, ProductTag, Subcategory, SubcategoryTranslations};
-use megacommerce_shared::models::errors::BoxedErr;
+use megacommerce_shared::models::{errors::BoxedErr, r_lock::RLock};
 use parking_lot::RwLock;
 use sqlx::{Pool, Postgres};
 
 #[derive(Debug)]
 pub struct Cache {
-  db: Arc<Pool<Postgres>>,
+  db: RLock<Pool<Postgres>>,
   tags: RwLock<Vec<ProductTag>>,
   categories: DashMap<String, Arc<Category>>,
   /// category_id -> ( subcategory_id -> Arc<Subcategory> )
@@ -23,7 +23,7 @@ pub struct Cache {
 
 #[derive(Debug)]
 pub struct CacheArgs {
-  pub db: Arc<Pool<Postgres>>,
+  pub db: RLock<Pool<Postgres>>,
 }
 
 impl Cache {

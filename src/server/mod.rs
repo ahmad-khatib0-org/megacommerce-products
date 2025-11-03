@@ -1,16 +1,17 @@
 mod config;
 mod database;
+mod getters;
 
 use std::error::Error;
 use std::sync::Arc;
 
 use megacommerce_proto::Config as SharedConfig;
-use megacommerce_shared::models::errors::{ErrorType, InternalError};
+use megacommerce_shared::models::errors::{BoxedErr, ErrorType, InternalError};
 use megacommerce_shared::models::translate::translations_init;
 use sqlx::{Pool, Postgres};
 use tokio::spawn;
 use tokio::sync::mpsc::{self, Receiver};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::common::main::{Common, CommonArgs};
 use crate::controller::{Controller, ControllerArgs};
@@ -20,10 +21,10 @@ use crate::store::database::dbstore::{ProductsStoreImpl, ProductsStoreImplArgs};
 
 pub struct Server {
   pub(crate) errors: mpsc::Sender<InternalError>,
-  pub(crate) db: Option<Arc<Pool<Postgres>>>,
+  pub(crate) db: Option<Arc<RwLock<Pool<Postgres>>>>,
   pub(crate) common: Option<Common>,
   pub(crate) service_config: Arc<Mutex<ServiceConfig>>,
-  pub(crate) shared_config: Arc<Mutex<SharedConfig>>,
+  pub(crate) shared_config: Arc<RwLock<SharedConfig>>,
 }
 
 #[derive(Debug)]
@@ -37,7 +38,7 @@ impl Server {
       errors: tx,
       common: None,
       service_config: Arc::new(Mutex::new(ServiceConfig::default())),
-      shared_config: Arc::new(Mutex::new(SharedConfig::default())),
+      shared_config: Arc::new(RwLock::new(SharedConfig::default())),
       db: None,
     };
 
@@ -55,7 +56,7 @@ impl Server {
 
     match server.common.as_mut().unwrap().config_get().await {
       Ok(cfg) => {
-        let mut shared_config = server.shared_config.lock().await;
+        let mut shared_config = server.shared_config.write().await;
         *shared_config = cfg;
       }
       Err(err) => return Err(err),
@@ -70,21 +71,21 @@ impl Server {
   }
 
   pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
-    let mk_err = |msg: &str, e: Box<dyn Error + Sync + Send>| InternalError {
+    let mk_err = |msg: &str, err: BoxedErr| InternalError {
       temp: false,
       err_type: ErrorType::Internal,
-      err: e,
+      err,
       msg: msg.to_string(),
       path: "products.server.run".into(),
     };
 
     self.init_database().await?;
 
-    let cache_args = CacheArgs { db: self.db.as_ref().unwrap().clone() };
+    let cache_args = CacheArgs { db: self.db() };
     let cache =
       Arc::new(Cache::new(cache_args).await.map_err(|e| mk_err("failed to initialize cache", e))?);
 
-    let store_args = ProductsStoreImplArgs { db: self.db.as_ref().unwrap().clone() };
+    let store_args = ProductsStoreImplArgs { db: self.db() };
     let store = Arc::new(ProductsStoreImpl::new(store_args));
 
     match self.common.as_mut().unwrap().translations_get().await {
@@ -95,8 +96,7 @@ impl Server {
       Err(err) => return Err(err),
     }
 
-    let cfg = self.shared_config.lock().await.clone();
-    let ctr_args = ControllerArgs { cfg, cache, store };
+    let ctr_args = ControllerArgs { cfg: self.config(), cache, store };
     let controller = Controller::new(ctr_args);
     controller.run().await
   }
