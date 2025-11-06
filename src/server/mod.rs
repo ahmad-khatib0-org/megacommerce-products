@@ -1,6 +1,7 @@
 mod config;
 mod database;
 mod getters;
+pub mod object_storage;
 
 use std::error::Error;
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use tokio::sync::{Mutex, RwLock};
 use crate::common::main::{Common, CommonArgs};
 use crate::controller::{Controller, ControllerArgs};
 use crate::models::config::Config as ServiceConfig;
+use crate::server::object_storage::ObjectStorage;
 use crate::store::cache::{Cache, CacheArgs};
 use crate::store::database::dbstore::{ProductsStoreImpl, ProductsStoreImplArgs};
 
@@ -25,6 +27,7 @@ pub struct Server {
   pub(crate) common: Option<Common>,
   pub(crate) service_config: Arc<Mutex<ServiceConfig>>,
   pub(crate) shared_config: Arc<RwLock<SharedConfig>>,
+  pub(crate) object_storage: Option<Arc<RwLock<ObjectStorage>>>,
 }
 
 #[derive(Debug)]
@@ -40,6 +43,7 @@ impl Server {
       service_config: Arc::new(Mutex::new(ServiceConfig::default())),
       shared_config: Arc::new(RwLock::new(SharedConfig::default())),
       db: None,
+      object_storage: None,
     };
 
     server.init_service_config().await?;
@@ -80,6 +84,7 @@ impl Server {
     };
 
     self.init_database().await?;
+    self.object_storage = Some(Arc::new(RwLock::new(ObjectStorage::new(self.config()).await?)));
 
     let cache_args = CacheArgs { db: self.db() };
     let cache =
@@ -96,7 +101,8 @@ impl Server {
       Err(err) => return Err(err),
     }
 
-    let ctr_args = ControllerArgs { cfg: self.config(), cache, store };
+    let ctr_args =
+      ControllerArgs { cfg: self.config(), cache, store, storage: self.object_storage() };
     let controller = Controller::new(ctr_args);
     controller.run().await
   }

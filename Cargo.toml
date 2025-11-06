@@ -5,13 +5,17 @@ edition = "2024"
 
 [dependencies]
 ## core
-megacommerce-proto = "0.3.65"
-megacommerce-shared = "0.4.42"
+megacommerce-proto = "0.3.71"
+megacommerce-shared = "0.4.72"
 tokio = { version = "1.45.1", features = ["full"] }
 tonic = "0.13.1"
 tower = "0.5.2"
 http = "1.3.1"
 tera = "1.20.0"
+image = "0.25.8"
+aws-sdk-s3 = "1.111.0"
+aws-config = "1.8.10"
+aws-credential-types = "1.2.8"
 rust_decimal = "1.37.2"
 bigdecimal = "0.4.8"
 parking_lot = "0.12.5"
@@ -46,7 +50,6 @@ regex = "1.11.1"
 # logging
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-image = "0.25.8"
 
 
 [features]
