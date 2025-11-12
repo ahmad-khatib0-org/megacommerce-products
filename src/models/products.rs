@@ -72,92 +72,9 @@ impl ProductFulfillmentType {
       Self::Supplier => "supplier",
     }
   }
-}
 
-lazy_static! {
-    // UPC (Universal Product Code) - Most common
-    // UPC-A: 12 digits
-    pub static ref PRODUCT_ID_TYPE_UPC_REGEX: Regex = Regex::new(r"^\d{12}$").unwrap();
-
-    // EAN (European Article Number)
-    // EAN-13: 13 digits
-    pub static ref PRODUCT_ID_TYPE_EAN_REGEX: Regex = Regex::new(r"^\d{13}$").unwrap();
-
-    // ISBN (International Standard Book Number) - For books
-    // ISBN-10: 10 digits or 9 digits + X
-    pub static ref PRODUCT_ID_TYPE_ISBN_REGEX: Regex = Regex::new(r"^(?:\d{9}[\dX]|\d{10})$").unwrap();
-
-    // GTIN (Global Trade Item Number
-    // GTIN: Can be 8, 12, 13, or 14 digits
-    pub static ref PRODUCT_ID_TYPE_GTIN_REGEX: Regex = Regex::new(r"^\d{8,14}$").unwrap();
-}
-
-pub fn validate_upc(upc: &str) -> bool {
-  PRODUCT_ID_TYPE_UPC_REGEX.is_match(upc) && validate_gtin_checksum(upc)
-}
-
-pub fn validate_ean(ean: &str) -> bool {
-  PRODUCT_ID_TYPE_EAN_REGEX.is_match(ean) && validate_gtin_checksum(ean)
-}
-
-pub fn validate_isbn(isbn: &str) -> bool {
-  PRODUCT_ID_TYPE_ISBN_REGEX.is_match(isbn) && validate_isbn_checksum(isbn)
-}
-
-pub fn validate_gtin(gtin: &str) -> bool {
-  PRODUCT_ID_TYPE_GTIN_REGEX.is_match(gtin) && validate_gtin_checksum(gtin)
-}
-
-// GTIN checksum validation (used for UPC, EAN, GTIN)
-fn validate_gtin_checksum(code: &str) -> bool {
-  let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
-
-  if digits.len() < 8 || digits.len() > 14 {
-    return false;
-  }
-
-  let sum: u32 = digits
-    .iter()
-    .enumerate()
-    .map(|(i, &digit)| {
-      let multiplier = if (digits.len() - i) % 2 == 0 { 1 } else { 3 };
-      digit * multiplier
-    })
-    .sum();
-
-  sum % 10 == 0
-}
-
-// ISBN-10 checksum validation
-fn validate_isbn_checksum(isbn: &str) -> bool {
-  let clean_isbn = isbn.replace("-", "");
-  if clean_isbn.len() != 10 {
-    return false;
-  }
-
-  let sum: u32 = clean_isbn
-    .chars()
-    .enumerate()
-    .map(|(i, c)| {
-      let digit = match c {
-        'X' | 'x' if i == 9 => 10,
-        _ => c.to_digit(10).unwrap_or(0),
-      };
-      digit * (10 - i as u32)
-    })
-    .sum();
-
-  sum % 11 == 0
-}
-
-// Usage example:
-pub fn product_id_is_validate(id_type: &str, id_value: &str) -> bool {
-  match id_type.to_lowercase().as_str() {
-    "upc" => validate_upc(id_value),
-    "ean" => validate_ean(id_value),
-    "isbn" => validate_isbn(id_value),
-    "gtin" => validate_gtin(id_value),
-    _ => false,
+  pub fn as_slice() -> [&'static str; 2] {
+    ["megacommerce", "supplier"]
   }
 }
 
@@ -197,5 +114,148 @@ impl ProductCreateStepsNames {
       Self::Offer => "offer",
       Self::Safety => "safety",
     }
+  }
+}
+
+// Regexes expect digit-only strings. We will clean the input before testing.
+lazy_static! {
+    // UPC-A: 12 digits
+    static ref PRODUCT_ID_TYPE_UPC_REGEX: Regex = Regex::new(r"^\d{12}$").unwrap();
+
+    // EAN-13: 13 digits
+    static ref PRODUCT_ID_TYPE_EAN_REGEX: Regex = Regex::new(r"^\d{13}$").unwrap();
+
+    // ISBN-10: 10 chars, last may be X or x (we'll check after cleaning hyphens)
+    static ref PRODUCT_ID_TYPE_ISBN10_REGEX: Regex = Regex::new(r"^(?:\d{9}[\dXx])$").unwrap();
+
+    // GTIN: 8..14 digits
+    static ref PRODUCT_ID_TYPE_GTIN_REGEX: Regex = Regex::new(r"^\d{8,14}$").unwrap();
+}
+
+/// Keep only ASCII digits from the input.
+fn only_digits(input: &str) -> String {
+  input.chars().filter(|c| c.is_ascii_digit()).collect()
+}
+
+/// GTIN checksum validation (for UPC, EAN, GTIN, and ISBN-13).
+/// We iterate from the RIGHTmost digit and apply weights 1,3,1,3...
+fn validate_gtin_checksum(code: &str) -> bool {
+  let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
+
+  if digits.len() < 8 || digits.len() > 14 {
+    return false;
+  }
+
+  // Iterate from right to left: index 0 is rightmost digit.
+  let sum: u32 = digits
+    .iter()
+    .rev()
+    .enumerate()
+    .map(|(i, &digit)| {
+      let multiplier = if i % 2 == 0 { 1 } else { 3 };
+      digit * multiplier
+    })
+    .sum();
+
+  sum % 10 == 0
+}
+
+pub fn validate_upc(upc: &str) -> bool {
+  let cleaned = only_digits(upc);
+  if !PRODUCT_ID_TYPE_UPC_REGEX.is_match(&cleaned) {
+    return false;
+  }
+  validate_gtin_checksum(&cleaned)
+}
+
+pub fn validate_ean(ean: &str) -> bool {
+  let cleaned = only_digits(ean);
+  if !PRODUCT_ID_TYPE_EAN_REGEX.is_match(&cleaned) {
+    return false;
+  }
+  validate_gtin_checksum(&cleaned)
+}
+
+pub fn validate_gtin(gtin: &str) -> bool {
+  let cleaned = only_digits(gtin);
+  if !PRODUCT_ID_TYPE_GTIN_REGEX.is_match(&cleaned) {
+    return false;
+  }
+  validate_gtin_checksum(&cleaned)
+}
+
+/// Validate ISBN: accept hyphens/spaces. Support ISBN-10 and ISBN-13.
+pub fn validate_isbn(isbn: &str) -> bool {
+  // Remove spaces and hyphens (and keep letters for ISBN-10 final X).
+  let no_hyphen_space: String = isbn.chars().filter(|c| !c.is_whitespace() && *c != '-').collect();
+
+  // Check for ISBN-13 (13 digits) -> use GTIN/EAN logic
+  let digits_only = only_digits(&no_hyphen_space);
+  if digits_only.len() == 13 && PRODUCT_ID_TYPE_EAN_REGEX.is_match(&digits_only) {
+    return validate_gtin_checksum(&digits_only);
+  }
+
+  // Check for ISBN-10 form: allow final X/x
+  let mut isbn10_filtered: String =
+    no_hyphen_space.chars().filter(|c| c.is_ascii_digit() || *c == 'X' || *c == 'x').collect();
+
+  if isbn10_filtered.len() == 10 && PRODUCT_ID_TYPE_ISBN10_REGEX.is_match(&isbn10_filtered) {
+    // ISBN-10 checksum: sum(digit * (10 - index)) where final X == 10
+    let sum: u32 = isbn10_filtered
+      .chars()
+      .enumerate()
+      .map(|(i, c)| {
+        let value = if i == 9 && (c == 'X' || c == 'x') { 10 } else { c.to_digit(10).unwrap_or(0) };
+        value * (10 - i as u32)
+      })
+      .sum();
+    return sum % 11 == 0;
+  }
+
+  false
+}
+
+pub fn product_id_is_validate(id_type: &str, id_value: &str) -> bool {
+  match id_type.to_lowercase().as_str() {
+    "upc" => validate_upc(id_value),
+    "ean" => validate_ean(id_value),
+    "isbn" => validate_isbn(id_value),
+    "gtin" => validate_gtin(id_value),
+    _ => false,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn upc_example_valid() {
+    // Your example: 036000291452 (12 digits UPC)
+    assert!(product_id_is_validate("upc", "036000291452"));
+  }
+
+  #[test]
+  fn isbn13_hyphenated_valid() {
+    // Your example: 978-1-56619-909-4 (ISBN-13 hyphenated)
+    assert!(product_id_is_validate("isbn", "978-1-56619-909-4"));
+  }
+
+  #[test]
+  fn isbn10_valid_with_x() {
+    // example ISBN-10 with X checksum (0306406152 is a classic valid ISBN-10)
+    assert!(product_id_is_validate("isbn", "0306406152"));
+  }
+
+  #[test]
+  fn gtin_8_valid_example() {
+    // example GTIN-8: 96385074 (classic test value)
+    assert!(product_id_is_validate("gtin", "96385074"));
+  }
+
+  #[test]
+  fn invalid_examples() {
+    assert!(!product_id_is_validate("upc", "1234567890123")); // wrong length
+    assert!(!product_id_is_validate("isbn", "978-1-56619-909-0")); // bad checksum
   }
 }

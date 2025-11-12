@@ -93,10 +93,16 @@ impl Server {
     let store_args = ProductsStoreImplArgs { db: self.db() };
     let store = Arc::new(ProductsStoreImpl::new(store_args));
 
+    let cfg = self.config().get().await.localization.clone().unwrap_or_default();
     match self.common.as_mut().unwrap().translations_get().await {
       Ok(res) => {
-        translations_init(res, 5)
-          .map_err(|e| mk_err("failed to init translations", Box::new(e)))?;
+        translations_init(
+          res,
+          5,
+          cfg.default_client_locale.unwrap_or_default(),
+          cfg.available_locales,
+        )
+        .map_err(|e| mk_err("failed to init translations", Box::new(e)))?;
       }
       Err(err) => return Err(err),
     }
@@ -109,7 +115,7 @@ impl Server {
 
   async fn errors_listener(mut receiver: Receiver<InternalError>) {
     while let Some(msg) = receiver.recv().await {
-      println!("from here {}", msg)
+      println!("errors_listener received an error: {}", msg)
     }
   }
 }

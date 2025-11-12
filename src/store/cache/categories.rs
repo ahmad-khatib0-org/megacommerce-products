@@ -48,12 +48,8 @@ impl Cache {
     self.subcategories_translation.clear();
 
     for c in rows {
-      println!("category id: {}", c.id);
       let subcategories: Vec<Subcategory> = from_value(c.subcategories)?; // error handling omitted
-
-      println!("after subcategories");
       let translations: Vec<CategoryTranslations> = from_value(c.translations)?;
-      println!("after translations");
 
       // insert category
       let cat = Arc::new(Category {

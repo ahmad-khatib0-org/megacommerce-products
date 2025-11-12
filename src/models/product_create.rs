@@ -14,33 +14,42 @@ use megacommerce_proto::{
     WithVariants as OfferWithVariants, WithoutVariants as OfferNoVariants,
   },
   validation_field::Rule,
-  Any, Attachment, Config, ConfigProducts, NumericRuleType, Product, ProductCreateRequest,
-  ProductCreateRequestDescription, ProductCreateRequestDetails,
-  ProductCreateRequestDetailsWithVariants, ProductCreateRequestDetailsWithoutVariants,
-  ProductCreateRequestIdentity, ProductCreateRequestMedia, ProductCreateRequestMediaWithVariants,
+  Any, Attachment, Attachments, Config, ConfigProducts, NumericRuleType, Product,
+  ProductBulletPoint, ProductCreateRequest, ProductCreateRequestDescription,
+  ProductCreateRequestDetails, ProductCreateRequestDetailsWithVariants,
+  ProductCreateRequestDetailsWithoutVariants, ProductCreateRequestIdentity,
+  ProductCreateRequestMedia, ProductCreateRequestMediaWithVariants,
   ProductCreateRequestMediaWithoutVariants, ProductCreateRequestOffer,
   ProductCreateRequestOfferMinimumOrder, ProductCreateRequestOfferWithVariants,
   ProductCreateRequestOfferWithoutVariants, ProductCreateRequestSafety,
-  ProductDataResponseSubcategory, StringRuleType, Subcategory, ValidationField,
-  ValidationFieldNumeric, ValidationFieldRegex, ValidationFieldString,
+  ProductDataResponseSubcategory, ProductDetails, ProductDetailsVariant, ProductOffer,
+  ProductOfferMinimumOrder, ProductOfferVariant, ProductSafety, StringRuleType, Subcategory,
+  ValidationField, ValidationFieldNumeric, ValidationFieldRegex, ValidationFieldString,
 };
 use megacommerce_shared::{
   models::{
     context::Context,
     errors::{AppError, AppErrorError, AppErrorErrors},
     files::UnitSizeType,
-    images::{validate_base64_image, ImageValidationConfig, ImageValidationError},
+    images::{
+      validate_base64_image, ImageValidationConfig, ImageValidationError, ImageValidationResult,
+    },
     products::SubcategoryAttributeType,
   },
-  utils::grpc::{grpc_deserialize_any, AnyValue},
+  utils::{
+    grpc::{grpc_deserialize_any, AnyExt, AnyValue},
+    time::time_get_millis,
+  },
 };
 use serde_json::{json, Value};
 use tonic::Code;
+use ulid::Ulid;
 
 use crate::{
+  data::currencies::CURRENCY_LIST,
   models::products::{
-    product_id_is_validate, ProductCreateStepsNames, ProductOfferingCondition,
-    PRODUCT_BRAND_NAME_MAX_LENGTH, PRODUCT_BRAND_NAME_MIN_LENGTH,
+    product_id_is_validate, ProductCreateStepsNames, ProductFulfillmentType,
+    ProductOfferingCondition, PRODUCT_BRAND_NAME_MAX_LENGTH, PRODUCT_BRAND_NAME_MIN_LENGTH,
     PRODUCT_DESCRIPTION_BULLET_POINTS_MAX_LENGTH, PRODUCT_DESCRIPTION_BULLET_POINTS_MIN_LENGTH,
     PRODUCT_DESCRIPTION_BULLET_POINT_MAX_LENGTH, PRODUCT_DESCRIPTION_BULLET_POINT_MIN_LENGTH,
     PRODUCT_DESCRIPTION_MAX_LENGTH, PRODUCT_DESCRIPTION_MIN_LENGTH, PRODUCT_ID_TYPES,
@@ -50,7 +59,7 @@ use crate::{
     PRODUCT_TITLE_MAX_LENGTH, PRODUCT_TITLE_MIN_LENGTH, PRODUCT_VARIATION_TITLE_MAX_LENGTH,
     PRODUCT_VARIATION_TITLE_MIN_LENGTH,
   },
-  utils::time::time_get_millis,
+  utils::slug::Slug,
 };
 
 use super::products::ProductStatus;
@@ -83,6 +92,24 @@ lazy_static! {
     AppErrorError { id: "form.fields.bigger_than_zero".into(), params: None };
   pub static ref ERR_MISSIN_FID: AppErrorError =
     AppErrorError { id: "form.field.id.missing_or_invalid".into(), params: None };
+  pub static ref ERR_MUST_CHECK: AppErrorError =
+    AppErrorError { id: "form.field.checkbox.checked.error".into(), params: None };
+}
+
+#[derive(Debug)]
+pub struct ProductCreateIsValidResult {
+  pub media_validation_results_no_variants: HashMap<String, ImageValidationResult>,
+  pub media_validation_results_with_variants:
+    HashMap<String, HashMap<String, ImageValidationResult>>,
+}
+
+impl Default for ProductCreateIsValidResult {
+  fn default() -> Self {
+    Self {
+      media_validation_results_no_variants: HashMap::new(),
+      media_validation_results_with_variants: HashMap::new(),
+    }
+  }
 }
 
 pub fn products_create_is_valid(
@@ -90,14 +117,15 @@ pub fn products_create_is_valid(
   product: &ProductCreateRequest,
   subcategory_data: Option<ProductDataResponseSubcategory>,
   config: &Config,
-) -> Result<(), AppError> {
-  let identity = product.identity.clone().unwrap_or(ProductCreateRequestIdentity::default());
-  let description =
-    product.description.clone().unwrap_or(ProductCreateRequestDescription::default());
-  let details = product.details.clone().unwrap_or(ProductCreateRequestDetails::default());
-  let media = product.media.clone().unwrap_or(ProductCreateRequestMedia::default());
-  let offer = product.offer.clone().unwrap_or(ProductCreateRequestOffer::default());
-  let safety = product.safety.clone().unwrap_or(ProductCreateRequestSafety::default());
+) -> Result<ProductCreateIsValidResult, AppError> {
+  let mut result = ProductCreateIsValidResult { ..Default::default() };
+
+  let identity = product.identity.clone().unwrap_or_default();
+  let description = product.description.clone().unwrap_or_default();
+  let details = product.details.clone().unwrap_or_default();
+  let media = product.media.clone().unwrap_or_default();
+  let offer = product.offer.clone().unwrap_or_default();
+  let safety = product.safety.clone().unwrap_or_default();
 
   let mut errors: HashMap<String, AppErrorError> = HashMap::new();
 
@@ -119,8 +147,9 @@ pub fn products_create_is_valid(
     return Err(error_builder(ctx, errors));
   }
 
-  // TODO: handle resumeable uploading case (for big media files)
-  media_form_validation(media, &mut errors, config);
+  let media_validaiton = media_form_validation(media, &mut errors, config);
+  result.media_validation_results_with_variants = media_validaiton.0;
+  result.media_validation_results_no_variants = media_validaiton.1;
   if errors.len() > 0 {
     return Err(error_builder(ctx, errors));
   }
@@ -135,7 +164,7 @@ pub fn products_create_is_valid(
     return Err(error_builder(ctx, errors));
   }
 
-  Ok(())
+  Ok(result)
 }
 
 fn identity_form_validation(
@@ -203,7 +232,7 @@ fn identity_form_validation(
     );
   }
   if !identity.no_product_id
-    && product_id_is_validate(&identity.product_id_type, &identity.product_id)
+    && !product_id_is_validate(&identity.product_id_type, &identity.product_id)
   {
     errors.insert(
       "identity.product_id".into(),
@@ -262,6 +291,9 @@ fn details_form_validation(
   errors: &mut HashMap<String, AppErrorError>,
   sub: &Subcategory,
 ) {
+  let step = ProductCreateStepsNames::Details;
+  let default_validation = &ValidationField::default();
+
   if details.details.is_none() {
     errors.insert(
       missing_form(&ProductCreateStepsNames::Details),
@@ -275,6 +307,27 @@ fn details_form_validation(
     }
     DetailsNoVariants(form) => details_without_variations_form_validation(form, errors, sub),
   };
+
+  for (field_name, field_value) in details.shared.iter() {
+    let found_field = sub.attributes.get(field_name);
+    if found_field.is_none() {
+      unknown_field(errors, &step, None, &field_name);
+      break;
+    }
+
+    let field = found_field.unwrap();
+    validate_attribute(
+      field_value,
+      field_name,
+      field.r#type.as_ref(),
+      errors,
+      &step,
+      None,
+      field.validation.as_ref().unwrap_or(default_validation),
+      field.required,
+      field.string_array.as_ref(),
+    );
+  }
 }
 
 // TODO: check for the fields that are required in &Subcategory, but user didn't send them
@@ -294,7 +347,7 @@ fn details_with_variations_form_validation(
     };
     if id.is_empty() {
       errors.insert(missing_form_id(&step), ERR_MISSIN_FID.clone());
-      return;
+      break;
     }
 
     let form_title = grpc_deserialize_any(variant.form.get("title").unwrap_or(&Any::default()));
@@ -305,7 +358,7 @@ fn details_with_variations_form_validation(
     if title.is_empty() {
       let err = AppErrorError { id: "products.variations.title.missing".to_string(), params: None };
       field_error(errors, &step, Some(&id), "title", err);
-      return;
+      break;
     }
     if title.len() < PRODUCT_VARIATION_TITLE_MIN_LENGTH
       || title.len() > PRODUCT_VARIATION_TITLE_MAX_LENGTH
@@ -316,26 +369,27 @@ fn details_with_variations_form_validation(
       ]));
       let err = AppErrorError { id: "products.variations.title.error".to_string(), params };
       field_error(errors, &step, Some(&id), "title", err);
-      return;
+      break;
     }
 
     for (field_name, field_value) in variant.form.iter() {
-      let found_field = sub.attributes.get(field_name);
-      if found_field.is_none() && field_name.as_str() != "id" && field_name.as_str() != "title" {
-        let params =
-          HashMap::from([("FieldName".to_string(), Value::String(field_name.to_string()))]);
-        let err = AppErrorError { id: "form.field.unknown".into(), params: Some(params) };
-        field_error(errors, &step, Some(&id), &field_name, err);
+      if field_name.as_str() == "id" || field_name.as_str() == "title" {
+        continue; // this field got validated
+      }
+
+      let field = sub.attributes.get(field_name);
+      if field.is_none() {
+        unknown_field(errors, &step, Some(&id), &field_name);
         break;
       }
 
-      if !found_field.unwrap().include_in_variants {
+      let field = field.unwrap();
+      if !field.include_in_variants {
         let err = AppErrorError { id: "form.field.not_customizable".into(), params: None };
         field_error(errors, &step, Some(&id), field_name, err);
         continue;
       }
 
-      let field = found_field.unwrap();
       validate_attribute(
         field_value,
         field_name,
@@ -362,10 +416,7 @@ fn details_without_variations_form_validation(
   for (field_name, field_value) in form.form.iter() {
     let found_field = sub.attributes.get(field_name);
     if found_field.is_none() {
-      let val = Value::String(field_name.to_string());
-      let params = Some(HashMap::from([("FieldName".to_string(), val)]));
-      let err = AppErrorError { id: "form.field.unknown".into(), params };
-      field_error(errors, &step, None, field_name, err);
+      unknown_field(errors, &step, None, &field_name);
       break;
     }
 
@@ -384,18 +435,26 @@ fn details_without_variations_form_validation(
   }
 }
 
-// TODO: handle validating videos also
+// TODO:
+// handle resumeable uploading case (for big media files)
+// handle validating videos also
+// handle validating checksum of attachments
 fn media_form_validation(
   media: ProductCreateRequestMedia,
   errors: &mut HashMap<String, AppErrorError>,
   config: &Config,
-) {
+) -> (HashMap<String, HashMap<String, ImageValidationResult>>, HashMap<String, ImageValidationResult>)
+{
+  let mut validation_results_variants: HashMap<String, HashMap<String, ImageValidationResult>> =
+    HashMap::new();
+  let mut validation_results_no_variants: HashMap<String, ImageValidationResult> = HashMap::new();
+
   if media.media.is_none() {
     errors.insert(
       missing_form(&ProductCreateStepsNames::Details),
       AppErrorError { id: "products.media.form.missing".into(), params: None },
     );
-    return;
+    return (validation_results_variants, validation_results_no_variants);
   }
 
   let form = media.media.unwrap();
@@ -423,9 +482,17 @@ fn media_form_validation(
     min_height: cfg.product_image_min_height as u32,
   };
   match form {
-    MediaWithVariants(m) => media_with_variations_form_validation(m, errors, config, img_config),
-    MediaNoVariants(m) => media_without_variations_form_validation(m, errors, config, img_config),
+    MediaWithVariants(m) => {
+      validation_results_variants =
+        media_with_variations_form_validation(m, errors, config, img_config);
+    }
+    MediaNoVariants(m) => {
+      validation_results_no_variants =
+        media_without_variations_form_validation(m, errors, config, img_config);
+    }
   }
+
+  (validation_results_variants, validation_results_no_variants)
 }
 
 fn media_with_variations_form_validation(
@@ -433,11 +500,13 @@ fn media_with_variations_form_validation(
   errors: &mut HashMap<String, AppErrorError>,
   config: &Config,
   img_cfg: &ImageValidationConfig,
-) {
+) -> HashMap<String, HashMap<String, ImageValidationResult>> {
   let step = &ProductCreateStepsNames::Media;
   let cfg = config.products.as_ref().unwrap();
   let min_count = cfg.product_images_min_count_per_variant.clone() as usize;
   let max_count = cfg.product_images_max_count_per_variant.clone() as usize;
+  let mut validation_results: HashMap<String, HashMap<String, ImageValidationResult>> =
+    HashMap::new();
 
   if forms.images.is_empty() {
     let err = AppErrorError { id: "products.media.missing_images".into(), params: None };
@@ -452,17 +521,25 @@ fn media_with_variations_form_validation(
       ]));
       let err = AppErrorError { id: "products.media.variant_images.count".into(), params };
       field_error(errors, step, Some(form.0), "count", err);
-      break;
+      return validation_results;
     }
 
     if form.0.is_empty() {
       errors.insert(missing_form_id(step), ERR_MISSIN_FID.clone());
-      break;
+      return validation_results;
     }
     for attachment in form.1.attachments.iter() {
-      validate_image(cfg, img_cfg, errors, step, Some(form.0), attachment);
+      let validation_result = validate_image(cfg, img_cfg, errors, step, Some(form.0), attachment);
+      if validation_result.is_some() {
+        validation_results
+          .entry(form.0.clone())
+          .or_insert_with(HashMap::new)
+          .insert(attachment.id.clone(), validation_result.unwrap());
+      }
     }
   }
+
+  validation_results
 }
 
 fn media_without_variations_form_validation(
@@ -470,11 +547,12 @@ fn media_without_variations_form_validation(
   errors: &mut HashMap<String, AppErrorError>,
   config: &Config,
   img_cfg: &ImageValidationConfig,
-) {
+) -> HashMap<String, ImageValidationResult> {
   let step = &ProductCreateStepsNames::Media;
   let cfg = config.products.as_ref().unwrap();
   let min_count = cfg.product_images_min_count_per_variant.clone() as usize;
   let max_count = cfg.product_images_max_count_per_variant.clone() as usize;
+  let mut validation_results: HashMap<String, ImageValidationResult> = HashMap::new();
 
   if form.images.is_empty() {
     let err = AppErrorError { id: "products.media.missing_images".into(), params: None };
@@ -488,12 +566,17 @@ fn media_without_variations_form_validation(
     ]));
     let err = AppErrorError { id: "products.media.variant_images.count".into(), params };
     field_error(errors, step, None, "count", err);
-    return;
+    return validation_results;
   }
 
   for attachment in form.images.iter() {
-    validate_image(cfg, img_cfg, errors, step, None, attachment);
+    let validation_result = validate_image(cfg, img_cfg, errors, step, None, attachment);
+    if validation_result.is_some() {
+      validation_results.insert(attachment.id.clone(), validation_result.unwrap());
+    }
   }
+
+  validation_results
 }
 
 fn validate_image(
@@ -503,7 +586,7 @@ fn validate_image(
   step: &ProductCreateStepsNames,
   form_id: Option<&str>,
   attachment: &Attachment,
-) {
+) -> Option<ImageValidationResult> {
   let max_size = cfg.product_image_max_size_mb;
   let min_w_dim = cfg.product_image_min_width;
   let max_w_dim = cfg.product_image_max_width;
@@ -514,7 +597,7 @@ fn validate_image(
 
   let result = validate_base64_image(&img_data, img_cfg);
   if result.is_err() {
-    match result.unwrap_err() {
+    match result.as_ref().unwrap_err() {
       ImageValidationError::LargeImage(_) => {
         let params = Some(HashMap::from([
           ("Max".into(), Value::Number(max_size.into())),
@@ -557,13 +640,17 @@ fn validate_image(
         field_error(errors, step, form_id, &attachment.id, err);
       }
     }
+    return None;
   }
+
+  Some(result.unwrap())
 }
 
 fn offer_form_validation(
   form: ProductCreateRequestOffer,
   errors: &mut HashMap<String, AppErrorError>,
 ) {
+  let step = &ProductCreateStepsNames::Offer;
   if form.pricing.is_none() {
     errors.insert(
       missing_form(&ProductCreateStepsNames::Offer),
@@ -575,6 +662,17 @@ fn offer_form_validation(
   match form.pricing.unwrap() {
     OfferWithVariants(offer) => offer_with_variations_form_validation(offer, errors),
     OfferNoVariants(offer) => offer_without_variations_form_validation(offer, errors),
+  }
+
+  if CURRENCY_LIST.iter().find(|cur| cur.code == form.currency).is_none() {
+    let err = AppErrorError { id: "products.currency_code.error".to_string(), params: None };
+    field_error(errors, step, None, "currency", err);
+  }
+  if !ProductFulfillmentType::as_slice().contains(&form.fulfillment_type.as_str()) {
+    field_error(errors, step, None, "fulfillment_type", ERR_INVALID_INP.clone());
+  }
+  if form.processing_time <= 0 {
+    field_error(errors, step, None, "processing_time", ERR_GT_0.clone());
   }
 }
 
@@ -777,17 +875,19 @@ fn validate_offer_pricing(
           Value::Number(PRODUCT_MINIMUM_INVENTORY_QUANTITY.into()),
         )]));
         let err = AppErrorError { id: "form.field.min".into(), params };
-        field_error(errors, step, form_id, &format!("{}.quantity", mo.id), err);
+        field_error(errors, step, form_id, &format!("minimum_orders.{}.quantity", mo.id), err);
       }
 
       match mo.price.parse::<f64>() {
         Ok(price) => {
           if price <= 0.0 {
-            field_error(errors, step, form_id, &format!("{}.price", mo.id), ERR_GT_0.clone());
+            let f_name = &format!("minimum_orders.{}.price", mo.id);
+            field_error(errors, step, form_id, f_name, ERR_GT_0.clone());
           }
         }
         Err(_) => {
-          field_error(errors, step, form_id, &format!("{}.price", mo.id), ERR_INVALID_NUM.clone());
+          let f_name = &format!("minimum_orders.{}.price", mo.id);
+          field_error(errors, step, form_id, f_name, ERR_INVALID_NUM.clone());
         }
       }
     }
@@ -802,38 +902,35 @@ fn validate_safety_form(
   let step = &ProductCreateStepsNames::Safety;
   if form.form.len() == 0 {
     errors.insert(
-      missing_form(&ProductCreateStepsNames::Safety),
+      missing_form(step),
       AppErrorError { id: "products.safety_and_compliance.form.missing".into(), params: None },
     );
     return;
   }
 
   let default_validation = &ValidationField::default();
+  if !form.attestation {
+    field_error(errors, step, None, "attestation", ERR_MUST_CHECK.clone());
+  }
+
   for (field_name, field_value) in form.form.iter() {
-    let found_field = sub.safety.get(field_name);
-    if found_field.is_none() {
-      let params =
-        HashMap::from([("FieldName".to_string(), Value::String(field_name.to_string()))]);
-      let err = AppErrorError { id: "form.field.unknown".into(), params: Some(params) };
-      field_error(errors, step, None, field_name, err);
+    let field = sub.safety.get(field_name);
+    if field.is_none() {
+      unknown_field(errors, &step, None, &field_name);
       break;
     }
 
-    let field = found_field.unwrap();
-    let typ = field.r#type.as_ref();
-    let required = field.required;
-    let string_array = field.string_array.as_ref();
-    let validation = field.validation.as_ref().unwrap_or(default_validation);
+    let field = field.unwrap();
     validate_attribute(
       field_value,
       field_name,
-      typ,
+      field.r#type.as_ref(),
       errors,
       step,
       None,
-      validation,
-      required,
-      string_array,
+      field.validation.as_ref().unwrap_or(default_validation),
+      field.required,
+      field.string_array.as_ref(),
     );
   }
 }
@@ -880,22 +977,27 @@ fn validate_attribute(
           }
           _ => {
             invalid_field_data(errors, step, form_id, field_name);
-            return;
           }
         },
-        AnyValue::Int64(int) => match validation.rule.as_ref().unwrap() {
+        AnyValue::Int32(int32) => match validation.rule.as_ref().unwrap() {
           Rule::Numeric(n) => {
-            validate_numeric(&n, int as f64, errors, form_id, field_name, step);
+            validate_numeric(&n, int32 as f64, errors, form_id, field_name, step);
           }
           _ => {
             invalid_field_data(errors, step, form_id, field_name);
-            return;
           }
         },
-        // Float, Int32, Bool, Bytes, Unknown can't happen for input type
+        AnyValue::Int64(int64) => match validation.rule.as_ref().unwrap() {
+          Rule::Numeric(n) => {
+            validate_numeric(&n, int64 as f64, errors, form_id, field_name, step);
+          }
+          _ => {
+            invalid_field_data(errors, step, form_id, field_name);
+          }
+        },
+        // Float, Bool, Bytes, Unknown can't happen for input type
         _ => {
           invalid_field_data(errors, step, form_id, field_name);
-          return;
         }
       }
     }
@@ -910,24 +1012,20 @@ fn validate_attribute(
       }
       _ => {
         invalid_field_data(errors, step, form_id, field_name);
-        return;
       }
     },
     SubcategoryAttributeType::Boolean => match value {
       AnyValue::Bool(val) => {
         if required && !val {
-          let err = AppErrorError { id: "form.field.checkbox.checked.error".into(), params: None };
-          field_error(errors, step, form_id, &field_name, err);
+          field_error(errors, step, form_id, &field_name, ERR_MUST_CHECK.clone());
         }
       }
       _ => {
         invalid_field_data(errors, step, form_id, field_name);
-        return;
       }
     },
     SubcategoryAttributeType::Unknown => {
       invalid_field_data(errors, step, form_id, field_name);
-      return;
     }
   }
 }
@@ -947,7 +1045,7 @@ fn validate_string(
           id: "form.field.min_length".to_string(),
           params: Some(HashMap::from([("Min".to_string(), json!(rule.value))])),
         };
-        field_error(errors, &step_name, form_id, &field_name, err);
+        field_error(errors, &step_name, form_id, field_name, err);
       }
     } else if rule.r#type == (StringRuleType::Max as i32) {
       if value.len() > (rule.value as usize) {
@@ -955,7 +1053,7 @@ fn validate_string(
           id: "form.field.max_length".to_string(),
           params: Some(HashMap::from([("Max".to_string(), json!(rule.value))])),
         };
-        field_error(errors, &step_name, form_id, &field_name, err);
+        field_error(errors, &step_name, form_id, field_name, err);
       }
     }
   }
@@ -976,7 +1074,7 @@ fn validate_numeric(
           id: "form.field.min".to_string(),
           params: Some(HashMap::from([("Min".to_string(), json!(rule.value))])),
         };
-        field_error(errors, step, form_id, &field_name, err);
+        field_error(errors, step, form_id, field_name, err);
       }
     } else if rule.r#type == (NumericRuleType::Max as i32) {
       if value > rule.value {
@@ -984,7 +1082,7 @@ fn validate_numeric(
           id: "form.field.max".to_string(),
           params: Some(HashMap::from([("Max".to_string(), json!(rule.value))])),
         };
-        field_error(errors, step, form_id, &field_name, err);
+        field_error(errors, step, form_id, field_name, err);
       }
     } else if rule.r#type == (NumericRuleType::Gt as i32) {
       if value <= rule.value {
@@ -992,7 +1090,7 @@ fn validate_numeric(
           id: "form.field.greater_than".to_string(),
           params: Some(HashMap::from([("Max".to_string(), json!(rule.value))])),
         };
-        field_error(errors, step, form_id, &field_name, err);
+        field_error(errors, step, form_id, field_name, err);
       }
     } else if rule.r#type == (NumericRuleType::Lt as i32) {
       if value >= rule.value {
@@ -1000,7 +1098,7 @@ fn validate_numeric(
           id: "form.field.less_than".to_string(),
           params: Some(HashMap::from([("Min".to_string(), json!(rule.value))])),
         };
-        field_error(errors, step, form_id, &field_name, err);
+        field_error(errors, step, form_id, field_name, err);
       }
     }
   }
@@ -1050,6 +1148,21 @@ fn field_error(
   errors.insert(key, err);
 }
 
+fn unknown_field(
+  errors: &mut HashMap<String, AppErrorError>,
+  form_name: &ProductCreateStepsNames,
+  form_id: Option<&str>,
+  field_name: &str,
+) {
+  let params = HashMap::from([("FieldName".to_string(), Value::String(field_name.to_string()))]);
+  let err = AppErrorError { id: "form.field.unknown".into(), params: Some(params) };
+  let key = match form_id {
+    Some(fid) => format!("{}.{}.{}", form_name.as_str(), fid, field_name),
+    None => format!("{}.{}", form_name.as_str(), field_name),
+  };
+  errors.insert(key, err);
+}
+
 fn missing_form_id(form_name: &ProductCreateStepsNames) -> String {
   format!("{}.form_id.missing", form_name.as_str())
 }
@@ -1059,6 +1172,9 @@ fn missing_form(form_name: &ProductCreateStepsNames) -> String {
 }
 
 fn error_builder(ctx: Arc<Context>, errors: HashMap<String, AppErrorError>) -> AppError {
+  // for err in errors.iter() {
+  //   println!("field {}, has error {:#?}", err.0, err.1);
+  // }
   AppError::new(
     ctx,
     "products.models.products_create_is_valid",
@@ -1070,24 +1186,316 @@ fn error_builder(ctx: Arc<Context>, errors: HashMap<String, AppErrorError>) -> A
   )
 }
 
-pub fn products_create_pre_save(
-  ctx: Arc<Context>,
-  _pro: &ProductCreateRequest,
-) -> Result<Product, AppError> {
-  let id = ulid::Ulid::new().to_string();
-  Ok(Product {
-    id,
-    user_id: ctx.session().user_id().to_string(),
-    version: 1,
-    status: ProductStatus::Pending.as_string(),
-    metadata: None,
-    created_at: time_get_millis(),
-    published_at: None,
-    updated_at: None,
-    ..Default::default()
+pub fn products_create_auditable_v1(product: &ProductCreateRequest) -> Value {
+  let identity = product.identity.clone().unwrap_or_default();
+  let description = product.description.clone().unwrap_or_default();
+  let details = product.details.clone().unwrap_or_default();
+  let media = product.media.clone().unwrap_or_default();
+  let offer = product.offer.clone().unwrap_or_default();
+  let safety = product.safety.clone().unwrap_or_default();
+
+  let mut media_var =
+    ProductCreateRequestMediaWithVariants { images: HashMap::new(), videos: HashMap::new() };
+  let mut media_no_var =
+    ProductCreateRequestMediaWithoutVariants { images: vec![], videos: vec![] };
+  let mut med = ProductCreateRequestMedia { total_size: media.total_size, media: None };
+
+  if let Some(media) = media.media {
+    match media {
+      MediaWithVariants(m) => {
+        media_var.images = product_create_auditable_attachments_with_variants_v1(m.images);
+        media_var.videos = product_create_auditable_attachments_with_variants_v1(m.videos);
+        med.media = Some(MediaWithVariants(media_var));
+      }
+      MediaNoVariants(m) => {
+        media_no_var.images = product_create_auditable_attachments_no_variants_v1(m.images);
+        media_no_var.videos = product_create_auditable_attachments_no_variants_v1(m.videos);
+        med.media = Some(MediaNoVariants(media_no_var));
+      }
+    }
+  }
+
+  json!({
+    "identity": identity,
+    "description": description,
+    "details": details,
+    "media": med,
+    "offer": offer,
+    "safety": safety,
   })
 }
 
-pub fn products_create_auditable(_p: &ProductCreateRequest) -> Value {
-  json!({})
+fn product_create_auditable_attachments_with_variants_v1(
+  attachments: HashMap<String, Attachments>,
+) -> HashMap<String, Attachments> {
+  let mut result: HashMap<String, Attachments> = HashMap::new();
+  for form in attachments.iter() {
+    let mut items: Vec<Attachment> = vec![];
+    for attachment in form.1.attachments.iter() {
+      items.push(Attachment { base64: "".to_string(), data: vec![], ..attachment.clone() });
+    }
+    result.insert(form.0.to_string(), Attachments { attachments: items });
+  }
+  result
+}
+
+fn product_create_auditable_attachments_no_variants_v1(
+  attachments: Vec<Attachment>,
+) -> Vec<Attachment> {
+  let mut result: Vec<Attachment> = vec![];
+  for att in attachments.iter() {
+    result.push(Attachment { base64: "".to_string(), data: vec![], ..att.clone() });
+  }
+  result
+}
+
+#[derive(Debug)]
+pub struct ProductCreatePreSaveResult {
+  pub product: Product,
+  pub variants_ids: HashMap<String, String>,
+  pub main_variant_key: String,
+}
+
+pub fn products_create_pre_save(
+  ctx: Arc<Context>,
+  pro: &ProductCreateRequest,
+) -> Result<ProductCreatePreSaveResult, AppError> {
+  let which = "which must not occurr at all, because it got validated before!";
+
+  let created_at = time_get_millis();
+  let variant_id = created_at.to_string();
+  let identity = pro.identity.clone().unwrap();
+  let description = pro.description.clone().unwrap();
+  let bullet_points: Vec<ProductBulletPoint> = description
+    .bullet_points
+    .iter()
+    .map(|bp| ProductBulletPoint {
+      id: Ulid::new().to_string(),
+      created_at,
+      text: bp.bullet_point.clone(),
+      updated_at: None,
+    })
+    .collect();
+
+  let mut variant_ids: HashMap<String, String> = HashMap::new();
+
+  let details =
+    products_create_pre_save_details(&pro.details, &mut variant_ids, &variant_id, which);
+  let offer = products_create_pre_save_offer(&pro.offer, &variant_ids, &variant_id, created_at);
+  let safety = products_create_pre_save_safety(&pro.safety);
+
+  let off = pro.offer.as_ref().unwrap();
+  let product = Product {
+    id: ulid::Ulid::new().to_string(),
+    user_id: ctx.session().user_id().to_string(),
+    title: identity.title.clone(),
+    category: identity.category,
+    subcategory: identity.subcategory,
+    has_variations: identity.has_variations,
+    brand_name: if identity.no_brand { None } else { Some(identity.brand_name) },
+    has_brand_name: identity.no_brand,
+    product_id: if identity.no_product_id { None } else { Some(identity.product_id) },
+    product_id_type: if identity.no_product_id { None } else { Some(identity.product_id_type) },
+    has_product_id: identity.no_product_id,
+    description: description.description,
+    bullet_points,
+    currency_code: off.currency.clone(),
+    fulfillment_type: off.fulfillment_type.clone(),
+    processing_time: off.processing_time,
+    details: Some(details),
+    media: None,
+    offer: Some(offer),
+    safety: Some(safety),
+    tags: vec![],
+    metadata: None,
+    ar_enabled: false,
+    slug: Slug::default().generate_slug(&identity.title),
+    status: ProductStatus::Pending.as_string(),
+    version: 1,
+    schema_version: 1,
+    created_at,
+    published_at: None,
+    updated_at: None,
+  };
+
+  Ok(ProductCreatePreSaveResult {
+    product,
+    variants_ids: variant_ids,
+    main_variant_key: variant_id,
+  })
+}
+
+fn products_create_pre_save_details(
+  details: &Option<ProductCreateRequestDetails>,
+  variant_ids: &mut HashMap<String, String>,
+  variant_id: &str,
+  which: &str,
+) -> ProductDetails {
+  let mut details_var: HashMap<String, ProductDetailsVariant> = HashMap::new();
+  let mut shared: HashMap<String, Any> = HashMap::new();
+  let path = "products.models.products_create_pre_save_details";
+
+  match details {
+    Some(details_outer) => {
+      match &details_outer.details {
+        Some(details) => match details {
+          DetailsVariants(forms) => {
+            for form in forms.variants.iter() {
+              let var_id_new = Ulid::new().to_string();
+              let var_data = get_variant_id_and_title(&form.form, path, which);
+              variant_ids.insert(var_data.0, var_id_new.clone());
+              details_var.insert(
+                var_id_new,
+                ProductDetailsVariant { variant_name: var_data.1, variant_data: form.form.clone() },
+              );
+            }
+            shared.extend(details_outer.shared.clone());
+          }
+          DetailsNoVariants(form) => {
+            // TODO: consider wither we need the variant name to be empty for a product
+            // without variants, or we can ask the user to name this
+            let var_id = Ulid::new().to_string();
+            variant_ids.insert(variant_id.to_string(), var_id.clone());
+            details_var.insert(
+              var_id,
+              ProductDetailsVariant {
+                variant_name: "".to_string(),
+                variant_data: form.form.clone(),
+              },
+            );
+          }
+        },
+        None => {
+          panic!("{}: the product's ProductCreateRequestDetails.details form is missing!", &path);
+        }
+      };
+    }
+    None => {
+      panic!("{}: the product's details form is missing!", &path);
+    }
+  }
+
+  ProductDetails { shared, details: details_var }
+}
+
+fn get_variant_id_and_title(
+  form: &HashMap<String, Any>,
+  path: &str,
+  which: &str,
+) -> (String, String) {
+  let get_string_field = |field: &str| -> String {
+    match grpc_deserialize_any(form.get(field).unwrap()) {
+      AnyValue::String(s) => s,
+      value => panic!(
+        "{}: the product's variant {} is not a valid string or missing, {}: {}",
+        path, field, which, value
+      ),
+    }
+  };
+
+  let var_id = get_string_field("id");
+  let var_name = get_string_field("title");
+
+  (var_id, var_name)
+}
+
+fn products_create_pre_save_offer(
+  offer: &Option<ProductCreateRequestOffer>,
+  variant_ids: &HashMap<String, String>,
+  variant_id: &str,
+  created_at: u64,
+) -> ProductOffer {
+  let mut result = ProductOffer { offer: HashMap::new() };
+  let path = "products.models.products_create_pre_save_offer".to_string();
+
+  let get_min_orders =
+    |mo: &Vec<ProductCreateRequestOfferMinimumOrder>| -> Vec<ProductOfferMinimumOrder> {
+      mo.iter()
+        .map(|mo| ProductOfferMinimumOrder {
+          id: Ulid::new().to_string(),
+          created_at,
+          updated_at: None,
+          price: mo.price.clone(),
+          quantity: mo.quantity,
+        })
+        .collect()
+    };
+
+  match offer {
+    Some(offer_inner) => match &offer_inner.pricing {
+      Some(pricing) => match pricing {
+        OfferWithVariants(form) => {
+          for var in form.variants.iter() {
+            let var_id = variant_ids
+              .get(&var.id)
+              .expect(&format!("{}: the product variant's id is not found", path));
+
+            let has_sale = var.has_sale_price.unwrap_or_default();
+            result.offer.insert(
+              var_id.to_string(),
+              ProductOfferVariant {
+                sku: var.sku.clone(),
+                quantity: var.quantity,
+                price: var.price.clone(),
+                offering_condition: var.offering_condition.clone(),
+                condition_note: var.condition_note.clone(),
+                list_price: var.list_price.clone(),
+                has_sale_price: has_sale,
+                sale_price: if has_sale { var.sale_price.clone() } else { None },
+                sale_price_start: if has_sale { var.sale_price_start.clone() } else { None },
+                sale_price_end: if has_sale { var.sale_price_end.clone() } else { None },
+                has_minimum_orders: var.has_minimum_orders,
+                minimum_orders: get_min_orders(&var.minimum_orders),
+              },
+            );
+          }
+        }
+        OfferNoVariants(var) => {
+          let var_id = variant_ids
+            .get(variant_id)
+            .expect(&format!("{}: the product variant's id is not found", path));
+          let has_sale = var.has_sale_price.unwrap_or_default();
+          result.offer.insert(
+            var_id.to_string(),
+            ProductOfferVariant {
+              sku: var.sku.clone(),
+              quantity: var.quantity,
+              price: var.price.clone(),
+              offering_condition: var.offering_condition.clone(),
+              condition_note: var.condition_note.clone(),
+              list_price: var.list_price.clone(),
+              has_sale_price: has_sale,
+              sale_price: if has_sale { var.sale_price.clone() } else { None },
+              sale_price_start: if has_sale { var.sale_price_start.clone() } else { None },
+              sale_price_end: if has_sale { var.sale_price_end.clone() } else { None },
+              has_minimum_orders: var.has_minimum_orders,
+              minimum_orders: get_min_orders(&var.minimum_orders),
+            },
+          );
+        }
+      },
+      None => {
+        panic!("{}: the product's offer form is missing!", &path);
+      }
+    },
+    None => todo!(),
+  }
+
+  return result;
+}
+
+fn products_create_pre_save_safety(safety: &Option<ProductCreateRequestSafety>) -> ProductSafety {
+  let mut result = ProductSafety { safety: HashMap::new() };
+  let path = "products.models.products_create_pre_save_safety".to_string();
+  match &safety {
+    Some(safety) => {
+      result.safety.extend(safety.form.clone());
+      result.safety.insert("attestation".to_string(), Any::from_bool(safety.attestation));
+    }
+    None => {
+      panic!("{}: the product's offer form is missing!", &path);
+    }
+  }
+
+  result
 }

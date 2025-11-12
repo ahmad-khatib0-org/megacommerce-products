@@ -1,5 +1,5 @@
 use serde::Serialize;
 
 pub(super) fn process_audit<T: Serialize>(_data: &T) {
-  todo!();
+  println!("called the process_audit");
 }

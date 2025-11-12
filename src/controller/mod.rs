@@ -17,9 +17,9 @@ use megacommerce_shared::{
 };
 use tonic::{service::InterceptorLayer, transport::Server as GrpcServer};
 use tower::ServiceBuilder;
-use tracing::info;
 
 use crate::{
+  server::object_storage::ObjectStorage,
   store::{cache::Cache, database::ProductsStore},
   utils::net::validate_url_target,
 };
@@ -29,18 +29,20 @@ pub struct Controller {
   pub(super) cfg: RLock<SharedConfig>,
   pub(super) cache: Arc<Cache>,
   pub(super) store: Arc<dyn ProductsStore + Send + Sync>,
+  pub storage: RLock<ObjectStorage>,
 }
 
 #[derive(Debug)]
 pub struct ControllerArgs {
   pub cfg: RLock<SharedConfig>,
+  pub storage: RLock<ObjectStorage>,
   pub cache: Arc<Cache>,
   pub store: Arc<dyn ProductsStore + Send + Sync>,
 }
 
 impl Controller {
   pub fn new(args: ControllerArgs) -> Controller {
-    Controller { cfg: args.cfg, cache: args.cache, store: args.store }
+    Controller { cfg: args.cfg, cache: args.cache, store: args.store, storage: args.storage }
   }
 
   pub async fn run(self) -> Result<(), Box<dyn Error>> {
@@ -57,13 +59,13 @@ impl Controller {
       })
     })?;
 
-    let layer = ServiceBuilder::new().layer(InterceptorLayer::new(middleware_context)).into_inner();
+    let svc = ProductsServiceServer::new(self);
+    let layer_stack = ServiceBuilder::new().layer(InterceptorLayer::new(middleware_context));
 
-    info!("products service server is running on: {}", url);
     GrpcServer::builder()
-      .layer(layer)
-      .add_service(ProductsServiceServer::new(self))
-      .serve((url.parse::<SocketAddr>()).unwrap())
+      .layer(layer_stack)
+      .add_service(svc)
+      .serve(url.parse::<SocketAddr>().unwrap())
       .await?;
 
     Ok(())
