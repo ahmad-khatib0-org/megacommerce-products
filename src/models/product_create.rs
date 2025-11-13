@@ -38,7 +38,7 @@ use megacommerce_shared::{
   },
   utils::{
     grpc::{grpc_deserialize_any, AnyExt, AnyValue},
-    time::time_get_millis,
+    time::{date_to_milliseconds, time_get_millis},
   },
 };
 use serde_json::{json, Value};
@@ -1422,65 +1422,94 @@ fn products_create_pre_save_offer(
     };
 
   match offer {
-    Some(offer_inner) => match &offer_inner.pricing {
-      Some(pricing) => match pricing {
-        OfferWithVariants(form) => {
-          for var in form.variants.iter() {
-            let var_id = variant_ids
-              .get(&var.id)
-              .expect(&format!("{}: the product variant's id is not found", path));
+    Some(offer_inner) => {
+      match &offer_inner.pricing {
+        Some(pricing) => {
+          match pricing {
+            OfferWithVariants(form) => {
+              for var in form.variants.iter() {
+                let var_id = variant_ids
+                  .get(&var.id)
+                  .expect(&format!("{}: the product variant's id is not found", path));
 
-            let has_sale = var.has_sale_price.unwrap_or_default();
-            result.offer.insert(
-              var_id.to_string(),
-              ProductOfferVariant {
-                sku: var.sku.clone(),
-                quantity: var.quantity,
-                price: var.price.clone(),
-                offering_condition: var.offering_condition.clone(),
-                condition_note: var.condition_note.clone(),
-                list_price: var.list_price.clone(),
-                has_sale_price: has_sale,
-                sale_price: if has_sale { var.sale_price.clone() } else { None },
-                sale_price_start: if has_sale { var.sale_price_start.clone() } else { None },
-                sale_price_end: if has_sale { var.sale_price_end.clone() } else { None },
-                has_minimum_orders: var.has_minimum_orders,
-                minimum_orders: get_min_orders(&var.minimum_orders),
-              },
-            );
+                let has_sale = var.has_sale_price.unwrap_or_default();
+                result.offer.insert(
+                  var_id.to_string(),
+                  ProductOfferVariant {
+                    sku: var.sku.clone(),
+                    quantity: var.quantity,
+                    price: var.price.clone(),
+                    offering_condition: var.offering_condition.clone(),
+                    condition_note: var.condition_note.clone(),
+                    list_price: var.list_price.clone(),
+                    has_sale_price: has_sale,
+                    sale_price: if has_sale { var.sale_price.clone() } else { None },
+                    sale_price_start: if has_sale {
+                      Some(date_to_milliseconds(&var.sale_price_start.clone().unwrap()).expect(
+                        &format!("{}: failed to convert sale_price_start to miliseconds", path),
+                      ))
+                    } else {
+                      None
+                    },
+                    sale_price_end: if has_sale {
+                      Some(date_to_milliseconds(&var.sale_price_end.clone().unwrap()).expect(
+                        &format!("{}: failed to convert sale_price_end to miliseconds", path),
+                      ))
+                    } else {
+                      None
+                    },
+                    has_minimum_orders: var.has_minimum_orders,
+                    minimum_orders: get_min_orders(&var.minimum_orders),
+                  },
+                );
+              }
+            }
+            OfferNoVariants(var) => {
+              let var_id = variant_ids
+                .get(variant_id)
+                .expect(&format!("{}: the product variant's id is not found", path));
+              let has_sale = var.has_sale_price.unwrap_or_default();
+              result.offer.insert(
+                var_id.to_string(),
+                ProductOfferVariant {
+                  sku: var.sku.clone(),
+                  quantity: var.quantity,
+                  price: var.price.clone(),
+                  offering_condition: var.offering_condition.clone(),
+                  condition_note: var.condition_note.clone(),
+                  list_price: var.list_price.clone(),
+                  has_sale_price: has_sale,
+                  sale_price: if has_sale { var.sale_price.clone() } else { None },
+                  sale_price_start: if has_sale {
+                    Some(date_to_milliseconds(&var.sale_price_start.clone().unwrap()).expect(
+                      &format!("{}: failed to convert sale_price_start to miliseconds", path),
+                    ))
+                  } else {
+                    None
+                  },
+                  sale_price_end: if has_sale {
+                    Some(date_to_milliseconds(&var.sale_price_end.clone().unwrap()).expect(
+                      &format!("{}: failed to convert sale_price_end to miliseconds", path),
+                    ))
+                  } else {
+                    None
+                  },
+                  has_minimum_orders: var.has_minimum_orders,
+                  minimum_orders: get_min_orders(&var.minimum_orders),
+                },
+              );
+            }
           }
         }
-        OfferNoVariants(var) => {
-          let var_id = variant_ids
-            .get(variant_id)
-            .expect(&format!("{}: the product variant's id is not found", path));
-          let has_sale = var.has_sale_price.unwrap_or_default();
-          result.offer.insert(
-            var_id.to_string(),
-            ProductOfferVariant {
-              sku: var.sku.clone(),
-              quantity: var.quantity,
-              price: var.price.clone(),
-              offering_condition: var.offering_condition.clone(),
-              condition_note: var.condition_note.clone(),
-              list_price: var.list_price.clone(),
-              has_sale_price: has_sale,
-              sale_price: if has_sale { var.sale_price.clone() } else { None },
-              sale_price_start: if has_sale { var.sale_price_start.clone() } else { None },
-              sale_price_end: if has_sale { var.sale_price_end.clone() } else { None },
-              has_minimum_orders: var.has_minimum_orders,
-              minimum_orders: get_min_orders(&var.minimum_orders),
-            },
-          );
+        None => {
+          panic!("{}: The product's ProductCreateRequestOffer.pricing form is missing!", &path);
         }
-      },
-      None => {
-        panic!("{}: the product's offer form is missing!", &path);
       }
-    },
-    None => todo!(),
+    }
+    None => {
+      panic!("{}: The product's offer form is missing!", &path);
+    }
   }
-
   return result;
 }
 

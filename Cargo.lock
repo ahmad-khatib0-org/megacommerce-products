@@ -2369,9 +2369,9 @@ dependencies = [
 
 [[package]]
 name = "megacommerce-shared"
-version = "0.4.75"
+version = "0.4.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "133a844d2f06083889bba743215893b329c110d45673159b5e98b5bef3566a3d"
+checksum = "66c04bb44fc9419460851cb3109074fbe600c690109884ddbec8ac2730ec77c7"
 dependencies = [
  "base64 0.22.1",
  "chrono",
