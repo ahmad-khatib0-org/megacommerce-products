@@ -1,5 +1,6 @@
 mod product_create;
 mod product_list;
+mod product_snapshot;
 mod router;
 
 use megacommerce_shared::models::r_lock::RLock;

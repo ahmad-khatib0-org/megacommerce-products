@@ -3,6 +3,7 @@ mod helpers;
 mod product_create;
 mod product_data;
 mod product_list;
+mod product_snapshot;
 mod router;
 
 use std::{error::Error, net::SocketAddr, sync::Arc};

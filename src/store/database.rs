@@ -1,6 +1,8 @@
 pub mod dbstore;
 
-use megacommerce_proto::{Product, ProductListItem, ProductListRequest};
+use megacommerce_proto::{
+  Product, ProductListItem, ProductListRequest, ProductSnapshot, ProductSnapshotRequest,
+};
 use megacommerce_shared::{models::context::Context, store::errors::DBError};
 use std::{fmt, sync::Arc};
 
@@ -12,4 +14,9 @@ pub trait ProductsStore: fmt::Debug + Send + Sync {
     ctx: Arc<Context>,
     request: &ProductListRequest,
   ) -> Result<Vec<ProductListItem>, DBError>;
+  async fn product_snapshot(
+    &self,
+    ctx: Arc<Context>,
+    request: &ProductSnapshotRequest,
+  ) -> Result<ProductSnapshot, DBError>;
 }
