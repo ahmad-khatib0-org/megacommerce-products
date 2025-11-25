@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
 use megacommerce_proto::{
-  Product, ProductListItem, ProductListRequest, ProductSnapshot, ProductSnapshotRequest,
+  BestSellingProductListItem, Product, ProductListItem, ProductListRequest, ProductSnapshot,
+  ProductSnapshotRequest,
 };
 use megacommerce_shared::{models::context::Context, store::errors::DBError};
 
 use crate::store::database::{
   dbstore::{
-    product_create::product_create, product_list::product_list, product_snapshot::product_snapshot,
-    ProductsStoreImpl,
+    best_selling_products::best_selling_products, product_create::product_create,
+    product_list::product_list, product_snapshot::product_snapshot, ProductsStoreImpl,
   },
   ProductsStore,
 };
@@ -31,5 +32,11 @@ impl ProductsStore for ProductsStoreImpl {
     req: &ProductSnapshotRequest,
   ) -> Result<ProductSnapshot, DBError> {
     product_snapshot(self, ctx, req).await
+  }
+  async fn best_selling_products(
+    &self,
+    ctx: Arc<Context>,
+  ) -> Result<Vec<BestSellingProductListItem>, DBError> {
+    best_selling_products(self, ctx).await
   }
 }

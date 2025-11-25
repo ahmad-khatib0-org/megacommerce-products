@@ -1,3 +1,4 @@
+mod best_selling_products;
 mod product_create;
 mod product_list;
 mod product_snapshot;

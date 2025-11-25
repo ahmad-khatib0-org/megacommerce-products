@@ -4,9 +4,8 @@ version = "0.1.11"
 edition = "2024"
 
 [dependencies]
-## core
-megacommerce-proto = "0.3.71"
-megacommerce-shared = "0.4.72"
+megacommerce-proto = "0.4.34"
+megacommerce-shared = "0.4.78"
 tokio = { version = "1.45.1", features = ["full"] }
 tonic = "0.13.1"
 tower = { version = "0.5.2", features = ["util"] }
@@ -50,6 +49,7 @@ ulid = "1.2.1"
 unidecode = "0.3.0"
 scopeguard = "1.2.0"
 regex = "1.11.1"
+rand = "0.9.2"
 
 # logging
 tracing = "0.1.41"

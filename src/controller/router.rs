@@ -1,13 +1,15 @@
 use megacommerce_proto::{
-  products_service_server::ProductsService, ProductCreateRequest, ProductCreateResponse,
-  ProductDataRequest, ProductDataResponse, ProductListRequest, ProductListResponse,
-  ProductSnapshotRequest, ProductSnapshotResponse,
+  products_service_server::ProductsService, BestSellingProductsRequest,
+  BestSellingProductsResponse, ProductCreateRequest, ProductCreateResponse, ProductDataRequest,
+  ProductDataResponse, ProductListRequest, ProductListResponse, ProductSnapshotRequest,
+  ProductSnapshotResponse,
 };
 use tonic::{Request, Response, Status};
 
 use crate::controller::{
-  product_create::product_create, product_data::product_data, product_list::product_list,
-  product_snapshot::product_snapshot, Controller,
+  best_selling_products::best_selling_products, product_create::product_create,
+  product_data::product_data, product_list::product_list, product_snapshot::product_snapshot,
+  Controller,
 };
 
 #[tonic::async_trait]
@@ -38,5 +40,12 @@ impl ProductsService for Controller {
     req: Request<ProductSnapshotRequest>,
   ) -> Result<Response<ProductSnapshotResponse>, Status> {
     product_snapshot(self, req).await
+  }
+
+  async fn best_selling_products(
+    &self,
+    req: Request<BestSellingProductsRequest>,
+  ) -> Result<Response<BestSellingProductsResponse>, Status> {
+    best_selling_products(self, req).await
   }
 }

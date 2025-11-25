@@ -196,7 +196,7 @@ pub fn validate_isbn(isbn: &str) -> bool {
   }
 
   // Check for ISBN-10 form: allow final X/x
-  let mut isbn10_filtered: String =
+  let isbn10_filtered: String =
     no_hyphen_space.chars().filter(|c| c.is_ascii_digit() || *c == 'X' || *c == 'x').collect();
 
   if isbn10_filtered.len() == 10 && PRODUCT_ID_TYPE_ISBN10_REGEX.is_match(&isbn10_filtered) {
