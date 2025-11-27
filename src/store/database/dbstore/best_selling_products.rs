@@ -33,7 +33,6 @@ pub(super) async fn best_selling_products(
 
   let db = &*s.db.get().await;
 
-  // Use query_as! if you have a struct that matches the query result
   let rows = sqlx::query!(
     r#"
     SELECT
