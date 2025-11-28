@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bigdecimal::num_traits::ToPrimitive;
-use megacommerce_proto::{BigDiscountProductListItem, ProductMedia};
+use megacommerce_proto::{NewlyAddedProductListItem, ProductMedia};
 use megacommerce_shared::{
   models::{
     context::Context,
@@ -11,13 +11,15 @@ use megacommerce_shared::{
 };
 use serde_json::from_value;
 
-use crate::store::database::dbstore::ProductsStoreImpl;
+use crate::{
+  models::time::format_human_readable_time, store::database::dbstore::ProductsStoreImpl,
+};
 
-pub(super) async fn big_discount_products(
+pub(super) async fn newly_added_products(
   s: &ProductsStoreImpl,
-  _: Arc<Context>,
-) -> Result<Vec<BigDiscountProductListItem>, DBError> {
-  let path = "products.store.big_discount_products".to_string();
+  ctx: Arc<Context>,
+) -> Result<Vec<NewlyAddedProductListItem>, DBError> {
+  let path = "products.store.newly_added_products".to_string();
   let de = |err: BoxedErr, msg: &str, err_type: Option<ErrorType>| {
     DBError::new(
       err_type.unwrap_or(ErrorType::DBSelectError),
@@ -37,18 +39,15 @@ pub(super) async fn big_discount_products(
           p.id,
           p.title,
           p.media,
+          p.created_at,
           variant.key as variant_id,
           (variant.value ->> 'price')::numeric as price,
           (variant.value ->> 'sale_price')::numeric as sale_price,
-          ((variant.value ->> 'price')::numeric - (variant.value ->> 'sale_price')::numeric) / (variant.value ->> 'price')::numeric as discount_percentage
+          ROW_NUMBER() OVER (
+            PARTITION BY p.id ORDER BY (variant.value ->> 'price')::numeric DESC
+          ) as rn
         FROM products p, 
         jsonb_each(p.offer -> 'offer') as variant
-        WHERE 
-              (variant.value ->> 'has_sale_price')::boolean = true 
-              AND (
-                (variant.value ->> 'sale_price_end') IS NULL 
-                OR (variant.value ->> 'sale_price_end')::bigint > EXTRACT(EPOCH FROM NOW()) * 1000
-              )
       )
       SELECT
           v.id,
@@ -57,19 +56,18 @@ pub(super) async fn big_discount_products(
           v.variant_id,
           v.price,
           v.sale_price,
-          v.discount_percentage,
-          COALESCE(ii.quantity_reserved, 0) AS sold_count
+          v.created_at
       FROM variants AS v
-      LEFT JOIN inventory_items AS ii ON ii.variant_id = v.variant_id
-      ORDER BY v.discount_percentage DESC
+      WHERE v.rn = 1
+      ORDER BY v.created_at DESC
       LIMIT 6
     "#
   )
   .fetch_all(db)
   .await
-  .map_err(|err| de(Box::new(err), "failed to select big discount products", None))?;
+  .map_err(|err| de(Box::new(err), "failed to select newly added products", None))?;
 
-  let mut big_discount_products = Vec::new();
+  let mut newly_added_products = Vec::new();
 
   for row in rows {
     let media: ProductMedia = from_value(row.media.unwrap_or_default()).map_err(|err| {
@@ -94,19 +92,25 @@ pub(super) async fn big_discount_products(
     let price_cents = (price * 100.0).round() as u32;
     let discount_price_cents = (sale_price * 100.0).round() as u32;
 
+    // Calculate discount percentage if sale price exists
     let discount_percentage =
-      (row.discount_percentage.unwrap_or_default().to_f64().unwrap_or(0.0) * 100.0).round() as u32;
+      if sale_price > 0.0 { ((price - sale_price) / price * 100.0).round() as u32 } else { 0 };
 
-    big_discount_products.push(BigDiscountProductListItem {
+    // Format the created_at timestamp
+    let created_at_ms = row.created_at.unwrap_or_default() as i64;
+    let timezone = &ctx.timezone;
+    let created_at = format_human_readable_time(&ctx.accept_language, created_at_ms, timezone);
+
+    newly_added_products.push(NewlyAddedProductListItem {
       id: row.id.unwrap_or_default(),
       title: row.title.unwrap_or_default(),
       image: image_url,
       price_cents,
-      discount_price_cents,
-      discount_percentage,
-      sold_count: row.sold_count.unwrap_or_default() as u32,
+      sale_price_cents: Some(discount_price_cents),
+      discount_percentage: Some(discount_percentage),
+      created_at,
     });
   }
 
-  Ok(big_discount_products)
+  Ok(newly_added_products)
 }

@@ -1,8 +1,8 @@
 pub mod dbstore;
 
 use megacommerce_proto::{
-  BestSellingProductListItem, BigDiscountProductListItem, Product, ProductListItem,
-  ProductListRequest, ProductSnapshot, ProductSnapshotRequest,
+  BestSellingProductListItem, BigDiscountProductListItem, NewlyAddedProductListItem, Product,
+  ProductListItem, ProductListRequest, ProductSnapshot, ProductSnapshotRequest,
 };
 use megacommerce_shared::{models::context::Context, store::errors::DBError};
 use std::{fmt, sync::Arc};
@@ -28,4 +28,8 @@ pub trait ProductsStore: fmt::Debug + Send + Sync {
     &self,
     _: Arc<Context>,
   ) -> Result<Vec<BigDiscountProductListItem>, DBError>;
+  async fn newly_added_products(
+    &self,
+    _: Arc<Context>,
+  ) -> Result<Vec<NewlyAddedProductListItem>, DBError>;
 }
