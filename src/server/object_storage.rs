@@ -10,7 +10,6 @@ use megacommerce_shared::models::{
 #[derive(Debug)]
 pub struct ObjectStorage {
   client: Client,
-  config: RLock<Config>,
   config_file: ConfigFile,
 }
 
@@ -37,7 +36,7 @@ impl ObjectStorage {
 
     let client = Client::from_conf(s3_config);
     Self::ensure_bucket(&client, cfg.amazon_s3_bucket()).await?;
-    Ok(Self { client, config, config_file: cfg })
+    Ok(Self { client, config_file: cfg })
   }
 
   pub async fn upload_file(

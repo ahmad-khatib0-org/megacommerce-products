@@ -1,17 +1,17 @@
 use megacommerce_proto::{
   products_service_server::ProductsService, BestSellingProductsRequest,
   BestSellingProductsResponse, BigDiscountProductsRequest, BigDiscountProductsResponse,
-  NewlyAddedProductsRequest, NewlyAddedProductsResponse, ProductCreateRequest,
-  ProductCreateResponse, ProductDataRequest, ProductDataResponse, ProductListRequest,
-  ProductListResponse, ProductSnapshotRequest, ProductSnapshotResponse,
+  HeroProductsRequest, HeroProductsResponse, NewlyAddedProductsRequest, NewlyAddedProductsResponse,
+  ProductCreateRequest, ProductCreateResponse, ProductDataRequest, ProductDataResponse,
+  ProductListRequest, ProductListResponse, ProductSnapshotRequest, ProductSnapshotResponse,
 };
 use tonic::{Request, Response, Status};
 
 use crate::controller::{
   best_selling_products::best_selling_products, big_discount_products::big_discount_products,
-  newly_added_products::newly_added_products, product_create::product_create,
-  product_data::product_data, product_list::product_list, product_snapshot::product_snapshot,
-  Controller,
+  hero_products::hero_products, newly_added_products::newly_added_products,
+  product_create::product_create, product_data::product_data, product_list::product_list,
+  product_snapshot::product_snapshot, Controller,
 };
 
 #[tonic::async_trait]
@@ -57,5 +57,11 @@ impl ProductsService for Controller {
     req: Request<NewlyAddedProductsRequest>,
   ) -> Result<Response<NewlyAddedProductsResponse>, Status> {
     newly_added_products(self, req).await
+  }
+  async fn hero_products(
+    &self,
+    req: Request<HeroProductsRequest>,
+  ) -> Result<Response<HeroProductsResponse>, Status> {
+    hero_products(self, req).await
   }
 }
