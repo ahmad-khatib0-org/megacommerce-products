@@ -2,8 +2,8 @@ pub mod dbstore;
 
 use megacommerce_proto::{
   BestSellingProductListItem, BigDiscountProductListItem, HeroProductsResponseData,
-  NewlyAddedProductListItem, Product, ProductListItem, ProductListRequest, ProductSnapshot,
-  ProductSnapshotRequest,
+  NewlyAddedProductListItem, Product, ProductSnapshot, ProductSnapshotRequest,
+  ProductToLikeListItem,
 };
 use megacommerce_shared::{models::context::Context, store::errors::DBError};
 use std::{fmt, sync::Arc};
@@ -11,11 +11,13 @@ use std::{fmt, sync::Arc};
 #[tonic::async_trait]
 pub trait ProductsStore: fmt::Debug + Send + Sync {
   async fn product_create(&self, ctx: Arc<Context>, product: &Product) -> Result<(), DBError>;
-  async fn product_list(
+  async fn products_to_like(
     &self,
     ctx: Arc<Context>,
-    request: &ProductListRequest,
-  ) -> Result<Vec<ProductListItem>, DBError>;
+    page: u32,
+    last_id: &str,
+    limit: i64,
+  ) -> Result<Vec<ProductToLikeListItem>, DBError>;
   async fn product_snapshot(
     &self,
     ctx: Arc<Context>,

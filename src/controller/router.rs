@@ -3,15 +3,15 @@ use megacommerce_proto::{
   BestSellingProductsResponse, BigDiscountProductsRequest, BigDiscountProductsResponse,
   HeroProductsRequest, HeroProductsResponse, NewlyAddedProductsRequest, NewlyAddedProductsResponse,
   ProductCreateRequest, ProductCreateResponse, ProductDataRequest, ProductDataResponse,
-  ProductListRequest, ProductListResponse, ProductSnapshotRequest, ProductSnapshotResponse,
+  ProductSnapshotRequest, ProductSnapshotResponse, ProductsToLikeRequest, ProductsToLikeResponse,
 };
 use tonic::{Request, Response, Status};
 
 use crate::controller::{
   best_selling_products::best_selling_products, big_discount_products::big_discount_products,
   hero_products::hero_products, newly_added_products::newly_added_products,
-  product_create::product_create, product_data::product_data, product_list::product_list,
-  product_snapshot::product_snapshot, Controller,
+  product_create::product_create, product_data::product_data, product_snapshot::product_snapshot,
+  products_to_like::products_to_like, Controller,
 };
 
 #[tonic::async_trait]
@@ -28,11 +28,11 @@ impl ProductsService for Controller {
   ) -> Result<Response<ProductDataResponse>, Status> {
     product_data(self, req).await
   }
-  async fn product_list(
+  async fn products_to_like(
     &self,
-    req: Request<ProductListRequest>,
-  ) -> Result<Response<ProductListResponse>, Status> {
-    product_list(self, req).await
+    req: Request<ProductsToLikeRequest>,
+  ) -> Result<Response<ProductsToLikeResponse>, Status> {
+    products_to_like(self, req).await
   }
   async fn product_snapshot(
     &self,

@@ -14,7 +14,7 @@ use crate::controller::Controller;
 
 pub(super) async fn big_discount_products(
   c: &Controller,
-  request: Request<BigDiscountProductsRequest>, // Changed
+  request: Request<BigDiscountProductsRequest>,
 ) -> Result<Response<BigDiscountProductsResponse>, Status> {
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let w = "products.controller.big_discount_products";

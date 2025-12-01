@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use megacommerce_proto::{
   BestSellingProductListItem, BigDiscountProductListItem, HeroProductsResponseData,
-  NewlyAddedProductListItem, Product, ProductListItem, ProductListRequest, ProductSnapshot,
-  ProductSnapshotRequest,
+  NewlyAddedProductListItem, Product, ProductSnapshot, ProductSnapshotRequest,
+  ProductToLikeListItem,
 };
 use megacommerce_shared::{models::context::Context, store::errors::DBError};
 
@@ -11,8 +11,8 @@ use crate::store::database::{
   dbstore::{
     best_selling_products::best_selling_products, big_discount_products::big_discount_products,
     hero_products::hero_products, newly_added_products::newly_added_products,
-    product_create::product_create, product_list::product_list, product_snapshot::product_snapshot,
-    ProductsStoreImpl,
+    product_create::product_create, product_snapshot::product_snapshot,
+    products_to_like::products_to_like, ProductsStoreImpl,
   },
   ProductsStore,
 };
@@ -22,12 +22,14 @@ impl ProductsStore for ProductsStoreImpl {
   async fn product_create(&self, ctx: Arc<Context>, product: &Product) -> Result<(), DBError> {
     product_create(self, ctx, product).await
   }
-  async fn product_list(
+  async fn products_to_like(
     &self,
     ctx: Arc<Context>,
-    product: &ProductListRequest,
-  ) -> Result<Vec<ProductListItem>, DBError> {
-    product_list(self, ctx, product).await
+    page: u32,
+    last_id: &str,
+    limit: i64,
+  ) -> Result<Vec<ProductToLikeListItem>, DBError> {
+    products_to_like(self, ctx, page, last_id, limit).await
   }
   async fn product_snapshot(
     &self,

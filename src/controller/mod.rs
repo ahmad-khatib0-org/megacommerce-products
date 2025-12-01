@@ -6,8 +6,8 @@ mod hero_products;
 mod newly_added_products;
 mod product_create;
 mod product_data;
-mod product_list;
 mod product_snapshot;
+mod products_to_like;
 mod router;
 
 use std::{error::Error, net::SocketAddr, sync::Arc};

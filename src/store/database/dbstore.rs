@@ -3,8 +3,8 @@ mod big_discount_products;
 mod hero_products;
 mod newly_added_products;
 mod product_create;
-mod product_list;
 mod product_snapshot;
+mod products_to_like;
 mod router;
 
 use megacommerce_shared::models::r_lock::RLock;
