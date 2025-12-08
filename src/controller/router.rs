@@ -1,16 +1,19 @@
 use megacommerce_proto::{
   products_service_server::ProductsService, BestSellingProductsRequest,
   BestSellingProductsResponse, BigDiscountProductsRequest, BigDiscountProductsResponse,
-  HeroProductsRequest, HeroProductsResponse, NewlyAddedProductsRequest, NewlyAddedProductsResponse,
-  ProductCreateRequest, ProductCreateResponse, ProductDataRequest, ProductDataResponse,
-  ProductSnapshotRequest, ProductSnapshotResponse, ProductsToLikeRequest, ProductsToLikeResponse,
+  CategoryNavbarRequest, CategoryNavbarResponse, HeroProductsRequest, HeroProductsResponse,
+  NewlyAddedProductsRequest, NewlyAddedProductsResponse, ProductCreateRequest,
+  ProductCreateResponse, ProductDataRequest, ProductDataResponse, ProductDetailsRequest,
+  ProductDetailsResponse, ProductSnapshotRequest, ProductSnapshotResponse, ProductsToLikeRequest,
+  ProductsToLikeResponse,
 };
 use tonic::{Request, Response, Status};
 
 use crate::controller::{
   best_selling_products::best_selling_products, big_discount_products::big_discount_products,
-  hero_products::hero_products, newly_added_products::newly_added_products,
-  product_create::product_create, product_data::product_data, product_snapshot::product_snapshot,
+  category_navbar::category_navbar, hero_products::hero_products,
+  newly_added_products::newly_added_products, product_create::product_create,
+  product_data::product_data, product_details::product_details, product_snapshot::product_snapshot,
   products_to_like::products_to_like, Controller,
 };
 
@@ -63,5 +66,17 @@ impl ProductsService for Controller {
     req: Request<HeroProductsRequest>,
   ) -> Result<Response<HeroProductsResponse>, Status> {
     hero_products(self, req).await
+  }
+  async fn product_details(
+    &self,
+    req: Request<ProductDetailsRequest>,
+  ) -> Result<Response<ProductDetailsResponse>, Status> {
+    product_details(self, req).await
+  }
+  async fn category_navbar(
+    &self,
+    req: Request<CategoryNavbarRequest>,
+  ) -> Result<Response<CategoryNavbarResponse>, Status> {
+    category_navbar(self, req).await
   }
 }
