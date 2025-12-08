@@ -72,6 +72,7 @@ pub(super) async fn best_selling_products(
       offer.price.parse::<f64>().expect(&format!("{}: Should convert price string to f64", path));
     best_sellers.push(BestSellingProductListItem {
       id: row.id,
+      variant_id: variant_id.to_string(),
       title: row.title,
       image: image.url.clone(),
       price_cents: (price * 100.0).round() as i64,

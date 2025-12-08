@@ -1,8 +1,10 @@
 mod best_selling_products;
 mod big_discount_products;
+mod category_navbar;
 mod hero_products;
 mod newly_added_products;
 mod product_create;
+mod product_details;
 mod product_snapshot;
 mod products_to_like;
 mod router;

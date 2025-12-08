@@ -22,6 +22,7 @@ pub(super) async fn big_discount_products(
     Response::new(BigDiscountProductsResponse { response: Some(Error(e.to_proto())) })
   };
   let ie = |err: BoxedErr| {
+    println!("{}", err);
     let errors = Some(AppErrorErrors { err: Some(err), ..Default::default() });
     AppError::new(ctx.clone(), w, MSG_ERR_INTERNAL, None, "", Code::Internal.into(), errors)
   };

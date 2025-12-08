@@ -1,5 +1,6 @@
 use std::io::{Error, ErrorKind};
 
+use bigdecimal::ToPrimitive;
 use megacommerce_proto::{
   ProductMedia, ProductOffer, ProductOfferVariant, ProductPrice, ProductToLikeListItem,
 };
@@ -10,6 +11,7 @@ use megacommerce_shared::{
   },
   store::errors::DBError,
 };
+use rand::Rng;
 use serde_json::from_value;
 use sqlx::FromRow;
 use std::sync::Arc;
@@ -127,10 +129,11 @@ pub(super) async fn products_to_like(
 
       Ok(ProductToLikeListItem {
         id: row.id,
+        variant_id: variant_id.to_string(),
         title: row.title,
         image: image_url,
         price: Some(product_price),
-        rating: None,
+        rating: (rand::rng().random_range(10..49) / 10).to_f64(),
         sold: Some(row.sold_count as i32),
         meta: vec![],
       })

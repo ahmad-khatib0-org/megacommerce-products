@@ -103,6 +103,7 @@ pub(super) async fn newly_added_products(
 
     newly_added_products.push(NewlyAddedProductListItem {
       id: row.id.unwrap_or_default(),
+      variant_id: variant_id.to_string(),
       title: row.title.unwrap_or_default(),
       image: image_url,
       price_cents,

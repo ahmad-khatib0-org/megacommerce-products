@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use megacommerce_proto::{PaginationRequest, PaginationResponse};
 use megacommerce_shared::models::{context::Context, errors::AppError};
@@ -39,4 +39,15 @@ pub(super) fn build_pagination_response(
     has_next: Some(pr.page_size() == items_count as u32),
     ..Default::default()
   }
+}
+
+pub fn is_valid_ulid(id: &str) -> bool {
+  if id.len() != 26 {
+    return false;
+  }
+  let result = ulid::Ulid::from_str(id);
+  if result.is_err() {
+    return false;
+  }
+  true
 }

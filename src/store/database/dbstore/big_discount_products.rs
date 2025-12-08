@@ -99,6 +99,7 @@ pub(super) async fn big_discount_products(
 
     big_discount_products.push(BigDiscountProductListItem {
       id: row.id.unwrap_or_default(),
+      variant_id: variant_id.to_string(),
       title: row.title.unwrap_or_default(),
       image: image_url,
       price_cents,
