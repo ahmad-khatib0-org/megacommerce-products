@@ -2369,9 +2369,9 @@ dependencies = [
 
 [[package]]
 name = "megacommerce-proto"
-version = "0.4.51"
+version = "0.4.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c44061ffd8365cf87a6d8da5d627d5b458da23bbb096bf1f96c93874f386d1b"
+checksum = "43215fb04c6ef91cd831e04881c4871a0afa346ceee0123867e163816d6b3d6f"
 dependencies = [
  "prost 0.13.5",
  "prost-types",

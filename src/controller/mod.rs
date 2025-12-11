@@ -9,6 +9,7 @@ mod product_create;
 mod product_data;
 mod product_details;
 mod product_snapshot;
+mod products_category;
 mod products_to_like;
 mod router;
 

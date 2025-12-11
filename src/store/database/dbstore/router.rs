@@ -3,7 +3,7 @@ use std::sync::Arc;
 use megacommerce_proto::{
   BestSellingProductListItem, BigDiscountProductListItem, CategoryNavbarResponseData,
   HeroProductsResponseData, NewlyAddedProductListItem, Product, ProductDetailsResponseData,
-  ProductSnapshot, ProductSnapshotRequest, ProductToLikeListItem,
+  ProductsCategoryItem, ProductSnapshot, ProductSnapshotRequest, ProductToLikeListItem,
 };
 use megacommerce_shared::{models::context::Context, store::errors::DBError};
 
@@ -13,7 +13,7 @@ use crate::store::database::{
     category_navbar::category_navbar, hero_products::hero_products,
     newly_added_products::newly_added_products, product_create::product_create,
     product_details::product_details, product_snapshot::product_snapshot,
-    products_to_like::products_to_like, ProductsStoreImpl,
+    products_category::products_category, products_to_like::products_to_like, ProductsStoreImpl,
   },
   ProductsStore,
 };
@@ -74,5 +74,18 @@ impl ProductsStore for ProductsStoreImpl {
     subcategory_id: &str,
   ) -> Result<CategoryNavbarResponseData, DBError> {
     category_navbar(self, ctx, category_id, subcategory_id).await
+  }
+  async fn products_category(
+    &self,
+    ctx: Arc<Context>,
+    category_id: &str,
+    subcategory_ids: &[String],
+    page: u32,
+    last_id: &str,
+    limit: i64,
+    sort_by: Option<&str>,
+    sort_direction: Option<&str>,
+  ) -> Result<Vec<ProductsCategoryItem>, DBError> {
+    products_category(self, ctx, category_id, subcategory_ids, page, last_id, limit, sort_by, sort_direction).await
   }
 }
