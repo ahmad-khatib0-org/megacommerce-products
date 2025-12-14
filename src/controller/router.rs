@@ -5,7 +5,8 @@ use megacommerce_proto::{
   NewlyAddedProductsRequest, NewlyAddedProductsResponse, ProductCreateRequest,
   ProductCreateResponse, ProductDataRequest, ProductDataResponse, ProductDetailsRequest,
   ProductDetailsResponse, ProductSnapshotRequest, ProductSnapshotResponse, ProductsCategoryRequest,
-  ProductsCategoryResponse, ProductsToLikeRequest, ProductsToLikeResponse,
+  ProductsCategoryResponse, ProductsListRequest, ProductsListResponse, ProductsToLikeRequest,
+  ProductsToLikeResponse,
 };
 use tonic::{Request, Response, Status};
 
@@ -14,7 +15,8 @@ use crate::controller::{
   category_navbar::category_navbar, hero_products::hero_products,
   newly_added_products::newly_added_products, product_create::product_create,
   product_data::product_data, product_details::product_details, product_snapshot::product_snapshot,
-  products_category::products_category, products_to_like::products_to_like, Controller,
+  products_category::products_category, products_list::products_list,
+  products_to_like::products_to_like, Controller,
 };
 
 #[tonic::async_trait]
@@ -84,5 +86,11 @@ impl ProductsService for Controller {
     req: Request<ProductsCategoryRequest>,
   ) -> Result<Response<ProductsCategoryResponse>, Status> {
     products_category(self, req).await
+  }
+  async fn products_list(
+    &self,
+    req: Request<ProductsListRequest>,
+  ) -> Result<Response<ProductsListResponse>, Status> {
+    products_list(self, req).await
   }
 }

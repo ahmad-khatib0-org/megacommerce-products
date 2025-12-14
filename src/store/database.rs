@@ -3,7 +3,8 @@ pub mod dbstore;
 use megacommerce_proto::{
   BestSellingProductListItem, BigDiscountProductListItem, CategoryNavbarResponseData,
   HeroProductsResponseData, NewlyAddedProductListItem, Product, ProductDetailsResponseData,
-  ProductsCategoryItem, ProductSnapshot, ProductSnapshotRequest, ProductToLikeListItem,
+  ProductListItem, ProductsCategoryItem, ProductSnapshot, ProductSnapshotRequest,
+  ProductToLikeListItem,
 };
 use megacommerce_shared::{models::context::Context, store::errors::DBError};
 use std::{fmt, sync::Arc};
@@ -58,4 +59,11 @@ pub trait ProductsStore: fmt::Debug + Send + Sync {
     sort_by: Option<&str>,
     sort_direction: Option<&str>,
   ) -> Result<Vec<ProductsCategoryItem>, DBError>;
+  async fn products_list(
+    &self,
+    ctx: Arc<Context>,
+    page: u32,
+    last_id: &str,
+    limit: i64,
+  ) -> Result<Vec<ProductListItem>, DBError>;
 }

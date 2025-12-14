@@ -6,7 +6,7 @@ use megacommerce_shared::{
   store::errors::{handle_db_error, DBError},
 };
 use serde_json::from_value;
-use sqlx::Row; // Make sure Row is imported
+use sqlx::Row;
 
 use crate::store::database::dbstore::ProductsStoreImpl;
 
