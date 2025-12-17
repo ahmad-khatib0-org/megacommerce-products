@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n      WITH variants AS (\n        SELECT\n          p.id,\n          p.title,\n          p.media,\n          variant.key as variant_id,\n          (variant.value ->> 'price')::numeric as price,\n          (variant.value ->> 'sale_price')::numeric as sale_price,\n          ((variant.value ->> 'price')::numeric - (variant.value ->> 'sale_price')::numeric) / (variant.value ->> 'price')::numeric as discount_percentage\n        FROM products p, \n        jsonb_each(p.offer -> 'offer') as variant\n        WHERE \n              (variant.value ->> 'has_sale_price')::boolean = true \n              AND (\n                (variant.value ->> 'sale_price_end') IS NULL \n                OR (variant.value ->> 'sale_price_end')::bigint > EXTRACT(EPOCH FROM NOW()) * 1000\n              )\n      )\n      SELECT\n          v.id,\n          v.title,\n          v.media,\n          v.variant_id,\n          v.price,\n          v.sale_price,\n          v.discount_percentage,\n          COALESCE(ii.quantity_reserved, 0) AS sold_count\n      FROM variants AS v\n      LEFT JOIN inventory_items AS ii ON ii.variant_id = v.variant_id\n      ORDER BY v.discount_percentage DESC\n      LIMIT 6\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "media",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "variant_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "sale_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "discount_percentage",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "sold_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "624a4db6e97298ec342adb499307e3827cbec6a7605fb3f1388eca309fd614f4"
+}

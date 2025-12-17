@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 FROM base AS deps
 
 COPY Cargo.toml Cargo.lock ./
+COPY .sqlx ./.sqlx
 COPY src ./src
 
 # Build deps

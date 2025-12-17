@@ -14,7 +14,7 @@ use crate::store::database::dbstore::ProductsStoreImpl;
 
 pub(super) async fn product_details(
   s: &ProductsStoreImpl,
-  ctx: Arc<Context>,
+  _ctx: Arc<Context>,
   id: &str,
 ) -> Result<ProductDetailsResponseData, DBError> {
   let path = "products.store.product_details";

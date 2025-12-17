@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n    SELECT \n      p.id,\n      p.title,\n      p.media,\n      p.offer\n    FROM \n      products AS p\n    WHERE \n      p.category = $1 \n      AND p.subcategory = $2 \n      AND p.status = 'published'\n    ORDER BY \n      RANDOM()\n    LIMIT 6\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "media",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "offer",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f000f6de0279e719260d567d7b118cbd0486f2a77e70cef47b8c7589634baabd"
+}

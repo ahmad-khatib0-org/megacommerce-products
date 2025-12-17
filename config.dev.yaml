@@ -1,0 +1,5 @@
+---
+service:
+  env: dev
+  service_grpc_url: 0.0.0.0:50053
+  common_service_grpc_url: http://common-service:50051

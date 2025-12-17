@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, image, subcategories, translations FROM categories",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "image",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "subcategories",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "translations",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "23b2c9946bfb89933cf676d924825d071a4ee798dae02862a224bfae39df7c2f"
+}

@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n    SELECT \n      id, user_id, title, category, subcategory, has_variations,\n      brand_name, product_id, product_id_type, description,\n      bullet_points, currency_code, fulfillment_type, processing_time,\n      details, media, offer, safety, tags, metadata\n    FROM products \n    WHERE id = $1\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "subcategory",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "has_variations",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "brand_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "product_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "product_id_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "bullet_points",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "currency_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "fulfillment_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "processing_time",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 14,
+        "name": "details",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 15,
+        "name": "media",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 16,
+        "name": "offer",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 17,
+        "name": "safety",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 18,
+        "name": "tags",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 19,
+        "name": "metadata",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "090f5b71dfa62910389af0fdae094a8f5e2846a450c281fa7b97addd4d21cb69"
+}

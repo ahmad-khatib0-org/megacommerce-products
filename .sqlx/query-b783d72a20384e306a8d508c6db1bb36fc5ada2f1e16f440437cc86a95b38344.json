@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n      WITH variants AS (\n        SELECT\n          p.id,\n          p.title,\n          p.media,\n          p.created_at,\n          variant.key as variant_id,\n          (variant.value ->> 'price')::numeric as price,\n          (variant.value ->> 'sale_price')::numeric as sale_price,\n          ROW_NUMBER() OVER (\n            PARTITION BY p.id ORDER BY (variant.value ->> 'price')::numeric DESC\n          ) as rn\n        FROM products p, \n        jsonb_each(p.offer -> 'offer') as variant\n      )\n      SELECT\n          v.id,\n          v.title,\n          v.media,\n          v.variant_id,\n          v.price,\n          v.sale_price,\n          v.created_at\n      FROM variants AS v\n      WHERE v.rn = 1\n      ORDER BY v.created_at DESC\n      LIMIT 6\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "media",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "variant_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "sale_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "b783d72a20384e306a8d508c6db1bb36fc5ada2f1e16f440437cc86a95b38344"
+}
