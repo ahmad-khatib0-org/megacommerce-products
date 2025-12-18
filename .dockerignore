@@ -1,0 +1,6 @@
+# Add these
+target/
+.git/
+.vscode/
+.env*
+*.log

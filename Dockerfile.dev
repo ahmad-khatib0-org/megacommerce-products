@@ -1,40 +1,33 @@
 # Multi-stage build for Rust service
-FROM rust:1.88-slim-bookworm AS base
+# Stage 1: Builder (musl for static linking)
+FROM rust:alpine AS builder
 
 WORKDIR /app
 
-ENV ENV=dev \
-    CARGO_NET_GIT_FETCH_WITH_CLI=true
+# Install build dependencies for Alpine
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev build-base postgresql-dev
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config \
-    libssl-dev \
-    postgresql-client \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Dependencies stage
-FROM base AS deps
-
+# Copy source
 COPY Cargo.toml Cargo.lock ./
 COPY .sqlx ./.sqlx
 COPY src ./src
 
-# Build deps
-RUN cargo build --release 2>&1 | grep -v "warning:" || true
+# Build release binary (statically linked)
+RUN cargo build --release --target x86_64-unknown-linux-musl && \
+    strip target/x86_64-unknown-linux-musl/release/megacommerce-products
 
-# Development stage
-FROM base AS dev
+# Stage 2: Tiny runtime image
+FROM alpine:latest
 
-COPY Cargo.toml Cargo.lock ./
-COPY --from=deps /app/target ./target
-COPY src ./src
-COPY config.yaml .
+WORKDIR /app
 
-# Install cargo-watch for hot reload
-RUN cargo install cargo-watch
+# Install runtime dependencies ONLY
+RUN apk add --no-cache libgcc postgresql-client curl ca-certificates
+
+# Copy stripped binary from builder
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/megacommerce-products /usr/local/bin/
+COPY config.yaml ./
 
 EXPOSE 50053
 
-CMD ["cargo", "watch", "-x", "run"]
+CMD ["/usr/local/bin/megacommerce-products"]
