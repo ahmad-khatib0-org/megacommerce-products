@@ -26,7 +26,7 @@ RUN apk add --no-cache libgcc postgresql-client curl ca-certificates
 
 # Copy stripped binary from builder
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/megacommerce-products /usr/local/bin/
-COPY config.yaml ./
+COPY config.dev.yaml ./
 
 EXPOSE 50053
 
