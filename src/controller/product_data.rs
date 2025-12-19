@@ -16,11 +16,16 @@ pub(super) async fn product_data(
   c: &Controller,
   request: Request<ProductDataRequest>,
 ) -> Result<Response<ProductDataResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.product_data_total.inc();
+  
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let req = request.into_inner();
   let lang = ctx.accept_language();
-  let return_err =
-    |e: AppError| Response::new(ProductDataResponse { response: Some(ResError(e.to_proto())) });
+  let return_err = |e: AppError| {
+    c.metrics.record_product_data_error();
+    Response::new(ProductDataResponse { response: Some(ResError(e.to_proto())) })
+  };
   let mk_err = |id: &str, p: OptionalParams, err: Option<AppErrorErrors>| {
     let path = "products.controller.product_data";
     AppError::new(ctx.clone(), path, id, p, "", Code::InvalidArgument.into(), err)
@@ -47,5 +52,7 @@ pub(super) async fn product_data(
     }
   }
 
+  let duration = start.elapsed().as_secs_f64();
+  c.metrics.record_product_data_success(duration);
   Ok(Response::new(ProductDataResponse { response: Some(Data(res)) }))
 }

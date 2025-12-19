@@ -16,6 +16,9 @@ pub(super) async fn best_selling_products(
   c: &Controller,
   request: Request<BestSellingProductsRequest>,
 ) -> Result<Response<BestSellingProductsResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.best_selling_products_total.inc();
+  
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let w = "products.controller.best_selling_products";
   let return_err = |e: AppError| {
@@ -28,8 +31,12 @@ pub(super) async fn best_selling_products(
 
   let products = c.store.best_selling_products(ctx.clone()).await;
   if products.is_err() {
+    c.metrics.record_best_selling_products_error();
     return Ok(return_err(ie(Box::new(products.unwrap_err()))));
   }
+
+  let duration = start.elapsed().as_secs_f64();
+  c.metrics.record_best_selling_products_success(duration);
 
   Ok(Response::new(BestSellingProductsResponse {
     response: Some(Data(megacommerce_proto::BestSellingProductsResponseData {

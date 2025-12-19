@@ -19,6 +19,9 @@ pub(super) async fn products_category(
   c: &Controller,
   request: Request<ProductsCategoryRequest>,
 ) -> Result<Response<ProductsCategoryResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.products_category_total.inc();
+  
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let req = request.into_inner();
 
@@ -34,6 +37,7 @@ pub(super) async fn products_category(
 
   // Validate pagination
   if let Err(err) = check_last_id(ctx.clone(), path, &req.pagination) {
+    c.metrics.record_products_category_error();
     return Ok(return_err(err));
   }
 
@@ -74,6 +78,8 @@ pub(super) async fn products_category(
 
   match result {
     Ok(products) => {
+      let duration = start.elapsed().as_secs_f64();
+      c.metrics.record_products_category_success(duration);
       let pagination_response = build_pagination_response(&pagination, products.iter().count());
       Ok(Response::new(ProductsCategoryResponse {
         response: Some(Data(ProductsCategoryResponseData {
@@ -82,6 +88,9 @@ pub(super) async fn products_category(
         })),
       }))
     }
-    Err(err) => Ok(return_err(ie(Box::new(err)))),
+    Err(err) => {
+      c.metrics.record_products_category_error();
+      Ok(return_err(ie(Box::new(err))))
+    }
   }
 }

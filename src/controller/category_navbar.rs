@@ -16,6 +16,9 @@ pub async fn category_navbar(
   c: &Controller,
   req: Request<CategoryNavbarRequest>,
 ) -> Result<Response<CategoryNavbarResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.category_navbar_total.inc();
+  
   let ctx = req.extensions().get::<Arc<Context>>().cloned().unwrap();
   let req_data = req.into_inner();
   let path = "products.controller.category_navbar";
@@ -33,9 +36,12 @@ pub async fn category_navbar(
 
   match result {
     Ok(data) => {
+      let duration = start.elapsed().as_secs_f64();
+      c.metrics.record_category_navbar_success(duration);
       return Ok(Response::new(CategoryNavbarResponse { response: Some(Data(data)) }));
     }
     Err(err) => {
+      c.metrics.record_category_navbar_error();
       if err.err_type == ErrorType::NoRows {
         let id = "categories.not_found.error";
         return Ok(return_err(ie(Box::new(err), id, Some(Code::NotFound))));

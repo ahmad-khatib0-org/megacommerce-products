@@ -16,6 +16,9 @@ pub async fn product_snapshot(
   c: &Controller,
   req: Request<ProductSnapshotRequest>,
 ) -> Result<Response<ProductSnapshotResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.product_snapshot_total.inc();
+  
   let ctx = req.extensions().get::<Arc<Context>>().cloned().unwrap();
   let req = req.into_inner();
   let path = "products.controller.product_snapshot";
@@ -29,6 +32,7 @@ pub async fn product_snapshot(
 
   let product_snapshot = c.store.product_snapshot(ctx.clone(), &req).await;
   if product_snapshot.is_err() {
+    c.metrics.record_product_snapshot_error();
     let unwrapped = product_snapshot.unwrap_err();
     match unwrapped.err_type {
       ErrorType::NoRows => {
@@ -40,5 +44,7 @@ pub async fn product_snapshot(
     }
   }
 
+  let duration = start.elapsed().as_secs_f64();
+  c.metrics.record_product_snapshot_success(duration);
   Ok(Response::new(ProductSnapshotResponse { response: Some(ResData(product_snapshot.unwrap())) }))
 }

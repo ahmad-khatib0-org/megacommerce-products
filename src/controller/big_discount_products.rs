@@ -16,6 +16,9 @@ pub(super) async fn big_discount_products(
   c: &Controller,
   request: Request<BigDiscountProductsRequest>,
 ) -> Result<Response<BigDiscountProductsResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.big_discount_products_total.inc();
+  
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let w = "products.controller.big_discount_products";
   let return_err = |e: AppError| {
@@ -29,8 +32,12 @@ pub(super) async fn big_discount_products(
 
   let products = c.store.big_discount_products(ctx.clone()).await;
   if products.is_err() {
+    c.metrics.record_big_discount_products_error();
     return Ok(return_err(ie(Box::new(products.unwrap_err()))));
   }
+
+  let duration = start.elapsed().as_secs_f64();
+  c.metrics.record_big_discount_products_success(duration);
 
   Ok(Response::new(BigDiscountProductsResponse {
     response: Some(Data(megacommerce_proto::BigDiscountProductsResponseData {

@@ -16,6 +16,9 @@ pub(super) async fn newly_added_products(
   c: &Controller,
   request: Request<NewlyAddedProductsRequest>,
 ) -> Result<Response<NewlyAddedProductsResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.newly_added_products_total.inc();
+  
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let w = "products.controller.newly_added_products";
   let return_err =
@@ -27,8 +30,12 @@ pub(super) async fn newly_added_products(
 
   let products = c.store.newly_added_products(ctx.clone()).await;
   if products.is_err() {
+    c.metrics.record_newly_added_products_error();
     return Ok(return_err(ie(Box::new(products.unwrap_err()))));
   }
+
+  let duration = start.elapsed().as_secs_f64();
+  c.metrics.record_newly_added_products_success(duration);
 
   Ok(Response::new(NewlyAddedProductsResponse {
     response: Some(Data(megacommerce_proto::NewlyAddedProductsResponseData {

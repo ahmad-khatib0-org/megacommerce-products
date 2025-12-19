@@ -19,6 +19,9 @@ pub(super) async fn products_to_like(
   c: &Controller,
   request: Request<ProductsToLikeRequest>,
 ) -> Result<Response<ProductsToLikeResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.products_to_like_total.inc();
+  
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let req = request.into_inner();
 
@@ -32,6 +35,7 @@ pub(super) async fn products_to_like(
   };
 
   if let Err(err) = check_last_id(ctx.clone(), w, &req.pagination) {
+    c.metrics.record_products_to_like_error();
     return Ok(return_err(err));
   }
 
@@ -42,9 +46,12 @@ pub(super) async fn products_to_like(
     c.store.products_to_like(ctx.clone(), pagination.page(), pagination.last_id(), limit).await;
 
   if let Err(err) = result {
+    c.metrics.record_products_to_like_error();
     return Ok(return_err(ie(Box::new(err))));
   } else {
     let products = result.unwrap();
+    let duration = start.elapsed().as_secs_f64();
+    c.metrics.record_products_to_like_success(duration);
     Ok(Response::new(ProductsToLikeResponse {
       response: Some(Data(ProductsToLikeResponseData {
         pagination: Some(build_pagination_response(pagination, products.iter().count())),

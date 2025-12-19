@@ -16,6 +16,9 @@ pub async fn hero_products(
   c: &Controller,
   req: Request<HeroProductsRequest>,
 ) -> Result<Response<HeroProductsResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.hero_products_total.inc();
+  
   let ctx = req.extensions().get::<Arc<Context>>().cloned().unwrap();
   let _req = req.into_inner();
   let path = "products.controller.hero_products";
@@ -32,6 +35,8 @@ pub async fn hero_products(
 
   match products {
     Ok(products) => {
+      let duration = start.elapsed().as_secs_f64();
+      c.metrics.record_hero_products_success(duration);
       return Ok(Response::new(HeroProductsResponse {
         response: Some(Data(HeroProductsResponseData {
           category_slider: Some(products.category_slider.unwrap()),
@@ -40,6 +45,7 @@ pub async fn hero_products(
       }))
     }
     Err(err) => {
+      c.metrics.record_hero_products_error();
       return Ok(return_err(ie(Box::new(err))));
     }
   }

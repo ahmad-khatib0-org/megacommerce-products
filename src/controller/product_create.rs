@@ -32,6 +32,9 @@ pub(super) async fn product_create(
   c: &Controller,
   req: Request<ProductCreateRequest>,
 ) -> Result<Response<ProductCreateResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.product_create_total.inc();
+  
   let path = "products.controller.product_create";
   let cfg = c.cfg.get().await;
   let ctx = req.extensions().get::<Arc<Context>>().cloned().unwrap();
@@ -40,8 +43,10 @@ pub(super) async fn product_create(
   let mut audit = AuditRecord::new(ctx.clone(), ProductCreate, Fail);
   let pro = req.into_inner();
 
-  let return_err =
-    |e: AppError| Response::new(ProductCreateResponse { response: Some(ResError(e.to_proto())) });
+  let return_err = |e: AppError| {
+    c.metrics.record_product_create_error();
+    Response::new(ProductCreateResponse { response: Some(ResError(e.to_proto()))})
+  };
 
   let pro_clone = pro.clone();
   let audit_data_future = spawn(async move { products_create_auditable_v1(&pro_clone) });
@@ -90,6 +95,9 @@ pub(super) async fn product_create(
 
   let message = tr::<()>(lang, "products.create.successfully", None)
     .unwrap_or("The Product created successfully!".to_string());
+
+  let duration = start.elapsed().as_secs_f64();
+  c.metrics.record_product_create_success(duration);
 
   Ok(Response::new(ProductCreateResponse {
     response: Some(ResData(SuccessResponseData { message: Some(message), ..Default::default() })),

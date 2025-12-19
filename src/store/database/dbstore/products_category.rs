@@ -21,7 +21,6 @@ struct ProductCategoryRow {
   offer: serde_json::Value,
   created_at: i64,
   sold_count: i64,
-  min_price: Option<f64>,
 }
 
 pub(super) async fn products_category(
@@ -194,4 +193,3 @@ pub(super) async fn products_category(
 
   Ok(products)
 }
-

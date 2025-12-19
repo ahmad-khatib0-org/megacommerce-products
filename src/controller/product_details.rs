@@ -19,6 +19,9 @@ pub async fn product_details(
   c: &Controller,
   request: Request<ProductDetailsRequest>,
 ) -> Result<Response<ProductDetailsResponse>, Status> {
+  let start = std::time::Instant::now();
+  c.metrics.product_details_total.inc();
+  
   let ctx = request.extensions().get::<Arc<Context>>().cloned().unwrap();
   let req = request.into_inner();
   let path = "products.controller.product_details";
@@ -39,11 +42,13 @@ pub async fn product_details(
   };
 
   if !is_valid_ulid(&req.product_id) {
+    c.metrics.record_product_details_error();
     return Ok(not_found(None));
   }
 
   let product = c.store.product_details(ctx.clone(), &req.product_id).await;
   if product.is_err() {
+    c.metrics.record_product_details_error();
     let err = product.unwrap_err();
     match err.err_type {
       ErrorType::NoRows => return Ok(not_found(Some(Box::new(err)))),
@@ -51,5 +56,7 @@ pub async fn product_details(
     }
   }
 
+  let duration = start.elapsed().as_secs_f64();
+  c.metrics.record_product_details_success(duration);
   Ok(Response::new(ProductDetailsResponse { response: Some(Data(product.unwrap())) }))
 }
